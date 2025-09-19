@@ -1,0 +1,16 @@
+{
+  "name": "chess-game-with-ai",
+  "version": "1.0.0",
+  "description": "A chess game with Stockfish AI integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "keywords": ["chess", "ai", "stockfish", "game"],
+  "author": "Chess Game Developer",
+  "license": "MIT"
+}
