@@ -4,7 +4,7 @@ class ChessGameClient {
         this.board = [];
         this.currentPlayer = 'white';
         this.selectedSquare = null;
-        this.gameStatus = 'playing';
+        this.gameStatus = 'waiting'; // Changed from 'playing' to 'waiting'
         this.gameMode = 'pvp';
         this.aiColor = '';
         this.aiDifficulty = 8;
@@ -25,8 +25,10 @@ class ChessGameClient {
         
         this.initializeBoard();
         this.renderBoard();
+        this.updateUI(); // Add this to update the initial UI
         this.attachEventListeners();
-        this.initializeWebSocket();
+        // Delay WebSocket initialization to allow board to render first
+        setTimeout(() => this.initializeWebSocket(), 1000);
     }
     
     initializeBoard() {
@@ -56,7 +58,15 @@ class ChessGameClient {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${protocol}//${window.location.host}/api/ws`;
         
-        this.ws = new WebSocket(wsUrl);
+        console.log('Attempting WebSocket connection to:', wsUrl);
+        
+        try {
+            this.ws = new WebSocket(wsUrl);
+        } catch (error) {
+            console.error('WebSocket initialization failed:', error);
+            // Continue without WebSocket for static deployment
+            return;
+        }
         
         this.ws.onopen = () => {
             console.log('WebSocket connected');
@@ -69,12 +79,18 @@ class ChessGameClient {
         
         this.ws.onclose = () => {
             console.log('WebSocket disconnected');
-            // Try to reconnect after 3 seconds
-            setTimeout(() => this.initializeWebSocket(), 3000);
+            // Only try to reconnect if we're in development or the connection was previously established
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                setTimeout(() => this.initializeWebSocket(), 3000);
+            }
         };
         
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
+            // On production (like Vercel), WebSocket might not be available
+            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                console.log('Running in production mode - WebSocket features may be limited');
+            }
         };
     }
     
@@ -127,6 +143,7 @@ class ChessGameClient {
             if (data.success) {
                 this.gameId = data.gameId;
                 this.gameMode = mode;
+                this.gameStatus = 'playing'; // Set status to playing when game is created
                 if (aiSettings) {
                     this.aiColor = aiSettings.color;
                     this.aiDifficulty = aiSettings.difficulty;
@@ -387,6 +404,12 @@ class ChessGameClient {
     
     renderBoard() {
         const boardElement = document.getElementById('chess-board');
+        if (!boardElement) {
+            console.error('Chess board element not found!');
+            return;
+        }
+        
+        console.log('Rendering board...', this.board); // Debug log
         boardElement.innerHTML = '';
         
         for (let row = 0; row < 8; row++) {
@@ -408,6 +431,8 @@ class ChessGameClient {
                 boardElement.appendChild(square);
             }
         }
+        
+        console.log('Board rendered with', boardElement.children.length, 'squares'); // Debug log
         
         // Update UI hints after rendering
         setTimeout(() => this.updateBoardHints(), 100);
@@ -663,8 +688,9 @@ class ChessGameClient {
         currentPlayerElement.style.borderRadius = '4px';
         currentPlayerElement.style.fontWeight = 'bold';
         
-        document.getElementById('game-status').textContent = 
+        const statusText = this.gameStatus === 'waiting' ? 'Ready to Play' : 
             this.gameStatus.charAt(0).toUpperCase() + this.gameStatus.slice(1);
+        document.getElementById('game-status').textContent = statusText;
         
         if (this.gameMode === 'ai') {
             document.getElementById('game-mode').textContent = `Human vs AI (AI plays ${this.aiColor})`;
