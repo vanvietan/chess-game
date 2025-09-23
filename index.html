@@ -9,7 +9,8 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <h1>Chess Game with AI</h1>
+            <h1>AI Chess Master</h1>
+            <p class="subtitle">Challenge Advanced Stockfish Engine</p>
             <div class="game-info">
                 <div class="current-player">
                     Current Player: <span id="current-player">White</span>
@@ -86,9 +87,30 @@
         </div>
         
         <div class="game-controls">
-            <button id="new-game-btn" class="btn">New Game (PvP)</button>
-            <button id="ai-game-btn" class="btn">Play vs AI</button>
-            <button id="rotate-board-btn" class="btn">Rotate Board</button>
+            <!-- Primary AI Button -->
+            <div class="primary-controls">
+                <button id="ai-game-btn" class="btn btn-primary">
+                    <span class="btn-icon">🤖</span>
+                    Play vs AI
+                </button>
+                <p class="primary-description">Challenge our advanced Stockfish AI engine</p>
+            </div>
+            
+            <!-- Secondary Controls -->
+            <div class="secondary-controls">
+                <button id="new-game-btn" class="btn btn-secondary">
+                    <span class="btn-icon">👥</span>
+                    Human vs Human
+                </button>
+                <button id="rotate-board-btn" class="btn btn-utility">
+                    <span class="btn-icon">🔄</span>
+                    Rotate
+                </button>
+                <button id="toggle-move-highlight-btn" class="btn btn-utility btn-toggle active" title="Toggle latest move highlighting">
+                    <span class="toggle-icon">👁️</span>
+                    Moves
+                </button>
+            </div>
         </div>
         
         <div id="ai-setup-modal" class="modal" style="display: none;">
@@ -110,7 +132,7 @@
                         <span id="difficulty-value">8</span>
                     </div>
                     <div class="form-actions">
-                        <button id="start-ai-game" class="btn">Start AI Game</button>
+                        <button id="start-ai-game" class="btn">Start</button>
                         <button id="cancel-ai-setup" class="btn btn-secondary">Cancel</button>
                     </div>
                 </div>

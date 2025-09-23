@@ -20,6 +20,7 @@ class ChessGameClient {
         this.arrows = []; // Store arrows for move visualization
         this.highlightedSquares = new Set(); // Custom square highlights
         this.lastMoveHighlight = null; // Highlight last move
+        this.showMoveHighlighting = true; // Toggle for move highlighting
         
         // Captured pieces tracking
         this.capturedPieces = {
@@ -1005,10 +1006,23 @@ class ChessGameClient {
     }
     
     updateLastMoveHighlight(fromCoords, toCoords) {
-        // Clear previous last move highlights
-        document.querySelectorAll('.square.last-move').forEach(sq => {
-            sq.classList.remove('last-move');
-        });
+        // Store the last move coordinates for toggling
+        this.lastMoveHighlight = { fromCoords, toCoords };
+        
+        // Apply highlighting if enabled
+        this.applyMoveHighlighting();
+    }
+    
+    applyMoveHighlighting() {
+        // Clear previous highlights and arrows
+        this.clearMoveHighlighting();
+        
+        // Only apply if highlighting is enabled and we have a last move
+        if (!this.showMoveHighlighting || !this.lastMoveHighlight) {
+            return;
+        }
+        
+        const { fromCoords, toCoords } = this.lastMoveHighlight;
         
         // Add last move highlight to from and to squares
         const fromSquare = document.querySelector(`[data-row="${fromCoords.row}"][data-col="${fromCoords.col}"]`);
@@ -1017,11 +1031,41 @@ class ChessGameClient {
         if (fromSquare) fromSquare.classList.add('last-move');
         if (toSquare) toSquare.classList.add('last-move');
         
-        // Optionally draw an arrow for the last move
-        this.clearArrows();
+        // Draw arrow for the last move
         const fromNotation = this.getSquareNotation(fromCoords.row, fromCoords.col);
         const toNotation = this.getSquareNotation(toCoords.row, toCoords.col);
         this.drawArrow(fromNotation, toNotation, 'primary');
+    }
+    
+    clearMoveHighlighting() {
+        // Clear previous last move highlights
+        document.querySelectorAll('.square.last-move').forEach(sq => {
+            sq.classList.remove('last-move');
+        });
+        
+        // Clear arrows
+        this.clearArrows();
+    }
+    
+    toggleMoveHighlighting() {
+        this.showMoveHighlighting = !this.showMoveHighlighting;
+        this.applyMoveHighlighting();
+        this.updateToggleButtonState();
+        
+        console.log('Move highlighting:', this.showMoveHighlighting ? 'enabled' : 'disabled');
+    }
+    
+    updateToggleButtonState() {
+        const toggleBtn = document.getElementById('toggle-move-highlight-btn');
+        const toggleIcon = toggleBtn.querySelector('.toggle-icon');
+        
+        if (this.showMoveHighlighting) {
+            toggleBtn.classList.add('active');
+            toggleBtn.innerHTML = '<span class="toggle-icon">👁️</span> Show Moves';
+        } else {
+            toggleBtn.classList.remove('active');
+            toggleBtn.innerHTML = '<span class="toggle-icon">🙈</span> Hide Moves';
+        }
     }
     
     // Add suggested moves visualization
@@ -1271,6 +1315,11 @@ class ChessGameClient {
         // Rotate board button
         document.getElementById('rotate-board-btn').addEventListener('click', () => {
             this.rotateBoard();
+        });
+        
+        // Move highlighting toggle button
+        document.getElementById('toggle-move-highlight-btn').addEventListener('click', () => {
+            this.toggleMoveHighlighting();
         });
         
         // Close modal when clicking outside
