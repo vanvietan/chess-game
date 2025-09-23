@@ -571,3 +571,51 @@ body {
     color: #17a2b8;
     font-weight: bold;
 }
+
+/* Promotion Modal Styles */
+.promotion-choices {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.promotion-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    border: 2px solid #ddd;
+    border-radius: 10px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: inherit;
+}
+
+.promotion-btn:hover {
+    border-color: #007bff;
+    background: #f8f9fa;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.promotion-piece {
+    font-size: 3em;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.promotion-btn span:last-child {
+    font-weight: bold;
+    color: #555;
+    font-size: 1.1em;
+}
+
+.promotion-btn:hover .promotion-piece {
+    color: #007bff;
+}
+
+.promotion-btn:hover span:last-child {
+    color: #007bff;
+}
