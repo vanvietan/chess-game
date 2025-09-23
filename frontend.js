@@ -17,12 +17,20 @@ class ChessGameClient {
         this.capturedPieces = { white: [], black: [] };
         this.showMoveHighlighting = true;
         this.soundEnabled = true;
+        this.showLegalMovesOnHover = true;
+        
+        // Input method selection: 'drag', 'click'
+        this.inputMethod = 'drag';
+        this.selectedSquare = null;
+        this.mutationObserver = null;
+        this.lastDragTime = 0;
         
         
         // Initialize
         this.initializeChessboard();
         this.attachEventListeners();
         this.updateUI();
+        this.updateInputMethodButton();
         this.updateToggleButtonState();
         this.updateSoundButtonState();
         this.setupKeyboardNavigation();
@@ -48,10 +56,18 @@ class ChessGameClient {
                 onDragStart: this.onDragStart.bind(this),
                 onDrop: this.onDrop.bind(this),
                 onSnapEnd: this.onSnapEnd.bind(this),
+                onMouseoverSquare: this.onMouseoverSquare.bind(this),
+                onMouseoutSquare: this.onMouseoutSquare.bind(this),
+                onSquareClick: this.onSquareClick.bind(this),
                 pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
                 showNotation: true,
                 sparePieces: false
             });
+            
+            console.log('Chessboard initialized with click-to-move');
+            
+            // Override chessboard.js click handling
+            setTimeout(() => this.overrideChessboardClicks(), 1000);
             
         } catch (error) {
             setTimeout(() => this.initializeChessboard(), 500);
@@ -62,11 +78,24 @@ class ChessGameClient {
         }
         
     onDragStart(source, piece, position, orientation) {
+        // Check if drag is allowed in current input method
+        if (this.inputMethod === 'click') {
+            return false; // Disable drag in click-only mode
+        }
+        
         const currentPlayer = this.game.turn() === 'w' ? 'white' : 'black';
         const pieceColor = piece.charAt(0) === 'w' ? 'white' : 'black';
-    
+
         if (pieceColor !== currentPlayer || this.game.game_over() || this.aiThinking) {
             return false;
+        }
+        
+        // Record drag start time to prevent clicks immediately after drag
+        this.lastDragTime = Date.now();
+        
+        // Clear any selection when starting to drag
+        if (this.selectedSquare) {
+            this.clearSquareSelection();
         }
         
         return true;
@@ -102,10 +131,292 @@ class ChessGameClient {
     
     onSnapEnd() {
         this.chessboard.position(this.game.fen());
+        // Update drag time when drag completes
+        this.lastDragTime = Date.now();
     }
+    
+    // No hover highlighting - only highlights when clicking
+    onMouseoverSquare(square, piece) {
+        // No hover highlighting anymore
+    }
+    
+    onMouseoutSquare() {
+        // No hover highlighting anymore
+    }
+    
+    highlightSquares(sourceSquare, moves) {
+        // Clear any existing highlights first
+        this.removeHighlights();
+        
+        // Highlight source square with selected style
+        this.addHighlight(sourceSquare, 'selected-square');
+        
+        // Highlight destination squares
+        for (let move of moves) {
+            this.addHighlight(move.to, 'highlight-black');
+        }
+    }
+    
+    addHighlight(square, className) {
+        const squareEl = document.querySelector('#chessboard .square-' + square);
+        if (squareEl) {
+            squareEl.classList.add(className);
+        }
+    }
+    
+    removeHighlights() {
+        document.querySelectorAll('#chessboard .square-55d63').forEach(square => {
+            square.classList.remove('highlight-white', 'highlight-black', 'selected-square');
+        });
+    }
+    
+    // Override chessboard.js internal click handling
+    overrideChessboardClicks() {
+        console.log('🔧 Overriding chessboard.js click handling...');
+        
+        const chessboardEl = document.getElementById('chessboard');
+        if (!chessboardEl) {
+            console.error('Chessboard element not found');
+            return;
+        }
+        
+        // Find all squares and pieces
+        const squares = chessboardEl.querySelectorAll('.square-55d63');
+        const pieces = chessboardEl.querySelectorAll('.piece-417db');
+        
+        console.log(`Found ${squares.length} squares and ${pieces.length} pieces`);
+        
+        // Override clicks on squares
+        squares.forEach(square => {
+            const classes = square.className;
+            const match = classes.match(/square-([a-h][1-8])/);
+            
+            if (match) {
+                const squareName = match[1];
+                
+                // Remove all existing event listeners by cloning the element
+                const newSquare = square.cloneNode(true);
+                square.parentNode.replaceChild(newSquare, square);
+                
+                // Add our click handler
+                newSquare.addEventListener('click', (e) => {
+                    // Only allow clicks in click mode
+                    if (this.inputMethod !== 'click') {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    this.onSquareClick(squareName);
+                }, true);
+            }
+        });
+        
+        // Override clicks on pieces
+        pieces.forEach(piece => {
+            const square = piece.closest('.square-55d63');
+            if (square) {
+                const classes = square.className;
+                const match = classes.match(/square-([a-h][1-8])/);
+                
+                if (match) {
+                    const squareName = match[1];
+                    
+                    // Remove all existing event listeners by cloning the element
+                    const newPiece = piece.cloneNode(true);
+                    piece.parentNode.replaceChild(newPiece, piece);
+                    
+                    // Add our click handler
+                    newPiece.addEventListener('click', (e) => {
+                        // Only allow clicks in click mode
+                        if (this.inputMethod !== 'click') {
+                            return;
+                        }
+                        
+                        e.preventDefault();
+                        e.stopImmediatePropagation();
+                        this.onSquareClick(squareName);
+                    }, true);
+                }
+            }
+        });
+        
+        
+        // Set up a mutation observer to handle dynamically added pieces
+        this.setupMutationObserver();
+    }
+    
+    // Watch for dynamically added pieces and override their clicks too
+    setupMutationObserver() {
+        if (this.mutationObserver) {
+            this.mutationObserver.disconnect();
+        }
+        
+        const chessboardEl = document.getElementById('chessboard');
+        if (!chessboardEl) return;
+        
+        this.mutationObserver = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        // Check if it's a piece
+                        if (node.classList && node.classList.contains('piece-417db')) {
+                            this.overridePieceClick(node);
+                        }
+                        
+                        // Check for pieces in added subtrees
+                        const pieces = node.querySelectorAll && node.querySelectorAll('.piece-417db');
+                        if (pieces) {
+                            pieces.forEach(piece => this.overridePieceClick(piece));
+                        }
+                    }
+                });
+            });
+        });
+        
+        this.mutationObserver.observe(chessboardEl, {
+            childList: true,
+            subtree: true
+        });
+        
+    }
+    
+    // Override clicks on a single piece
+    overridePieceClick(piece) {
+        const square = piece.closest('.square-55d63');
+        if (square) {
+            const classes = square.className;
+            const match = classes.match(/square-([a-h][1-8])/);
+            
+            if (match) {
+                const squareName = match[1];
+                
+                piece.addEventListener('click', (e) => {
+                    // Only allow clicks in click mode
+                    if (this.inputMethod !== 'click') {
+                        return;
+                    }
+                    
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    this.onSquareClick(squareName);
+                }, true);
+            }
+        }
+    }
+    
+    // Simple click-to-move implementation
+    onSquareClick(square) {
+        // If no piece is selected, try to select this square
+        if (!this.selectedSquare) {
+            this.selectPiece(square);
+        } else {
+            // A piece is selected, try to move to clicked square
+            this.tryMove(this.selectedSquare, square);
+        }
+    }
+    
+    selectPiece(square) {
+        const piece = this.game.get(square);
+        
+        // Only select if there's a piece and it belongs to current player
+        if (!piece) {
+            return;
+        }
+        
+        const currentPlayer = this.game.turn();
+        if (piece.color !== currentPlayer) {
+            return;
+        }
+        
+        // If clicking the same square, deselect
+        if (this.selectedSquare === square) {
+            this.clearSquareSelection();
+            return;
+        }
+        
+        this.selectedSquare = square;
+        
+        // Get legal moves for this piece and highlight them
+        const moves = this.game.moves({
+            square: square,
+            verbose: true
+        });
+        
+        // Highlight the selected square and its legal moves
+        this.highlightSquares(square, moves);
+    }
+    
+    tryMove(fromSquare, toSquare) {
+        // Try the move with chess.js
+        const move = this.game.move({
+            from: fromSquare,
+            to: toSquare,
+            promotion: 'q' // Always promote to queen
+        });
+        
+        if (move) {
+            // Legal move - update the board position
+            this.chessboard.position(this.game.fen());
+            this.clearSquareSelection();
+            this.updateAfterMove(move);
+        } else {
+            // Illegal move - try to select the destination square instead
+            this.clearSquareSelection();
+            this.selectPiece(toSquare);
+        }
+    }
+    
+    clearSquareSelection() {
+        this.selectedSquare = null;
+        this.removeHighlights();
+    }
+    
+    // Toggle between input methods: drag ↔ click
+    toggleInputMethod() {
+        this.inputMethod = this.inputMethod === 'drag' ? 'click' : 'drag';
+        
+        // Clear any selection when switching methods
+        this.clearSquareSelection();
+        
+        this.updateInputMethodButton();
+    }
+    
+    updateInputMethodButton() {
+        const button = document.getElementById('input-method-btn');
+        const text = document.getElementById('input-method-text');
+        
+        if (button && text) {
+            const icons = {
+                'drag': '🖱️',
+                'click': '👆'
+            };
+            
+            const names = {
+                'drag': 'Drag',
+                'click': 'Click'
+            };
+            
+            button.querySelector('.toggle-icon').textContent = icons[this.inputMethod];
+            text.textContent = names[this.inputMethod];
+            
+            const titles = {
+                'drag': 'Drag-and-drop pieces to move',
+                'click': 'Click pieces to move'
+            };
+            
+            button.title = titles[this.inputMethod];
+        }
+    }
+    
     
     updateAfterMove(move) {
         this.addMoveToHistory(move);
+        
+        // Clear any selection after move
+        if (this.selectedSquare) {
+            this.clearSquareSelection();
+        }
         
         if (move.captured) {
             const capturedPiece = {
@@ -203,27 +514,7 @@ class ChessGameClient {
         });
     }
     
-    toggleMoveHighlighting() {
-        this.showMoveHighlighting = !this.showMoveHighlighting;
-        this.updateToggleButtonState();
-        
-        if (!this.showMoveHighlighting) {
-            this.clearMoveHighlighting();
-        }
-    }
     
-    updateToggleButtonState() {
-        const button = document.getElementById('toggle-move-highlight-btn');
-        if (button) {
-            if (this.showMoveHighlighting) {
-                button.classList.add('active');
-                button.title = 'Disable move highlighting';
-        } else {
-                button.classList.remove('active');
-                button.title = 'Enable move highlighting';
-            }
-        }
-    }
     
     createGame(mode = 'human', aiSettings = null) {
         this.gameId = 'local-' + Math.random().toString(36).substr(2, 9);
@@ -704,14 +995,14 @@ class ChessGameClient {
             console.error('Rotate button not found');
         }
         
-        const toggleBtn = document.getElementById('toggle-move-highlight-btn');
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                this.toggleMoveHighlighting();
+        const inputMethodBtn = document.getElementById('input-method-btn');
+        if (inputMethodBtn) {
+            inputMethodBtn.addEventListener('click', () => {
+                this.toggleInputMethod();
             });
-            console.log('Toggle move highlight button listener attached successfully');
+            console.log('Input method button listener attached successfully');
         } else {
-            console.error('Toggle move highlight button not found');
+            console.error('Input method button not found');
         }
 
         const soundToggleBtn = document.getElementById('sound-toggle-btn');
@@ -804,9 +1095,31 @@ class ChessGameClient {
 
 document.addEventListener('DOMContentLoaded', () => {
     window.chessGame = new ChessGameClient();
+    
+    // Expose test functions globally
+    window.testClick = (square) => {
+        console.log('Testing click on', square);
+        window.chessGame.onSquareClick(square);
+    };
+    
+    window.recheckClickListeners = () => {
+        console.log('Re-adding click listeners...');
+        window.chessGame.addManualClickListeners();
+    };
 });
 
 // Fallback if DOMContentLoaded already fired
 if (document.readyState !== 'loading') {
     window.chessGame = new ChessGameClient();
+    
+    // Expose test functions globally
+    window.testClick = (square) => {
+        console.log('Testing click on', square);
+        window.chessGame.onSquareClick(square);
+    };
+    
+    window.recheckClickListeners = () => {
+        console.log('Re-adding click listeners...');
+        window.chessGame.addManualClickListeners();
+    };
 }
