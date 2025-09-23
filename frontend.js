@@ -17,6 +17,7 @@ class ChessGameClient {
         this.capturedPieces = { white: [], black: [] };
         this.showMoveHighlighting = true;
         
+        
         // Initialize
         this.initializeChessboard();
         this.attachEventListeners();
@@ -26,29 +27,13 @@ class ChessGameClient {
     }
     
     initializeChessboard() {
-        console.log('Attempting to initialize chessboard...');
-        
-        if (typeof Chessboard === 'undefined') {
-            console.log('Chessboard.js not loaded yet, retrying...');
-            setTimeout(() => this.initializeChessboard(), 100);
-            return;
-        }
-        
-        if (typeof Chess === 'undefined') {
-            console.log('Chess.js not loaded yet, retrying...');
-            setTimeout(() => this.initializeChessboard(), 100);
-            return;
-        }
-        
-        if (typeof $ === 'undefined') {
-            console.log('jQuery not loaded yet, retrying...');
+        if (typeof Chessboard === 'undefined' || typeof Chess === 'undefined' || typeof $ === 'undefined') {
             setTimeout(() => this.initializeChessboard(), 100);
             return;
         }
 
         const boardElement = document.getElementById('chessboard');
         if (!boardElement) {
-            console.error('Chessboard element not found!');
             setTimeout(() => this.initializeChessboard(), 100);
             return;
         }
@@ -65,11 +50,7 @@ class ChessGameClient {
                 sparePieces: false
             });
             
-            console.log('Chess.js + Chessboard.js initialized successfully');
-            console.log('Chessboard object:', this.chessboard);
-            
         } catch (error) {
-            console.error('Error initializing chessboard:', error);
             setTimeout(() => this.initializeChessboard(), 500);
             return;
         }
@@ -137,8 +118,6 @@ class ChessGameClient {
         
         // Clear any error messages
         this.clearErrorMessage();
-        
-        console.log(`Move made: ${move.from} -> ${move.to}`);
         
         if (this.game.game_over()) {
             this.handleGameOver();
@@ -265,15 +244,13 @@ class ChessGameClient {
         this.clearErrorMessage();
         
         if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
-            console.log('Setting up AI as white, flipping board');
             if (this.chessboard) {
                 this.chessboard.flip();
             }
             setTimeout(() => this.makeStockfishAIMove(), 1000);
         }
         
-        console.log(`New game created: ${mode} mode`, aiSettings);
-                return true;
+        return true;
     }
     
     async makeStockfishAIMove() {
@@ -293,7 +270,6 @@ class ChessGameClient {
                 return;
             }
             
-            console.log(`AI thinking... FEN: ${fen}, Difficulty: ${this.aiDifficulty}`);
             
             // Use real Stockfish 17 API from chess-api.com
             let bestMove;
@@ -304,8 +280,6 @@ class ChessGameClient {
                     const fromSquare = apiResponse.move.substring(0, 2);
                     const toSquare = apiResponse.move.substring(2, 4);
                     const promotion = apiResponse.move.length > 4 ? apiResponse.move.substring(4) : undefined;
-                    
-                    console.log(`Stockfish suggests: ${apiResponse.move} (${apiResponse.san}) - Eval: ${apiResponse.eval}`);
                     
                     // Try to make the move suggested by Stockfish
                     const moveObj = {
@@ -318,15 +292,10 @@ class ChessGameClient {
                     }
                     
                     bestMove = this.game.move(moveObj);
-                    
-                    if (bestMove) {
-                        console.log(`AI move executed: ${bestMove.san} (strength: ${this.getStrengthDescription(apiResponse.eval)})`);
-                    }
                 } else {
                     throw new Error('Invalid API response');
                 }
             } catch (apiError) {
-                console.warn('Stockfish API failed, falling back to basic AI:', apiError);
                 // Fallback to basic AI if API fails
                 bestMove = this.getBasicAIMove(moves);
             }
@@ -334,9 +303,7 @@ class ChessGameClient {
             if (bestMove) {
                 this.chessboard.position(this.game.fen());
                 this.updateAfterMove(bestMove);
-                } else {
-                console.error('No valid move found');
-            }
+                }
             
         } catch (error) {
             console.error('AI move error:', error);
@@ -370,8 +337,6 @@ class ChessGameClient {
             }
             
             const data = await response.json();
-            console.log('Stockfish API response:', data);
-            
             return data;
             
         } catch (error) {
@@ -397,7 +362,6 @@ class ChessGameClient {
             selectedMove = moves[Math.floor(Math.random() * moves.length)];
         }
         
-        console.log('Using basic AI fallback move:', selectedMove.san);
         return this.game.move(selectedMove);
     }
     
@@ -453,7 +417,6 @@ class ChessGameClient {
         if (this.chessboard) {
             this.chessboard.flip();
         }
-        console.log('Board rotated');
     }
     
     updateUI() {
@@ -542,6 +505,7 @@ class ChessGameClient {
             }
         });
     }
+    
     
     // Error message handling
     showErrorMessage(message) {
@@ -705,3 +669,8 @@ class ChessGameClient {
 document.addEventListener('DOMContentLoaded', () => {
     window.chessGame = new ChessGameClient();
 });
+
+// Fallback if DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+    window.chessGame = new ChessGameClient();
+}

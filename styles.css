@@ -156,39 +156,40 @@ body {
     overflow: hidden;
 }
 
-/* Light squares - using brighter surface color for better visibility */
+/* Light squares - more subtle light color */
 #chessboard div[class*="white"] {
-    background-color: var(--surface-bg) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: #f8f8f8 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Dark squares - using card background for contrast */
+/* Dark squares - purple-gray mix (40% purple) */
 #chessboard div[class*="black"] {
-    background-color: var(--card-bg) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background-color: #6366a0 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
 }
 
 /* Alternative targeting for chessboard squares */
 #chessboard .white-square {
-    background-color: var(--surface-bg) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    background-color: #f8f8f8 !important;
+    border: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
 
 #chessboard .black-square {
-    background-color: var(--card-bg) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    background-color: #6366a0 !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
 }
 
-/* Enhanced piece styling for dark theme board */
+/* Enhanced piece styling for classic board colors */
 #chessboard img {
     transition: all 0.2s ease !important;
-    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.6)) !important;
+    filter: drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.4)) !important;
 }
 
 #chessboard img:hover {
     transform: scale(1.05) !important;
-    filter: brightness(1.1) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.7)) !important;
+    filter: brightness(1.1) drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5)) !important;
 }
+
 
 /* Board container styling without border */
 #chessboard > div {
