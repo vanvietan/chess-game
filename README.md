@@ -12,7 +12,7 @@ A simple, elegant chess game built with vanilla JavaScript. Play against a frien
 
 ## 🚀 Live Demo
 
-[Play Chess Now](https://your-vercel-app.vercel.app) *(Replace with your actual Vercel URL)*
+[Play Chess Now](https://chess-game-snowy-iota.vercel.app/) 
 
 ## 🎯 How to Play
 
