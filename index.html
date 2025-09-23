@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess Game with Stockfish AI</title>
     <link rel="stylesheet" href="styles.css">
+    
+    <!-- Chess.js for game logic and Chessboard.js for UI -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
 </head>
 <body>
     <div class="game-container">
@@ -28,61 +34,20 @@
         </div>
         
         <div class="board-container">
-            <div class="board-wrapper">
-                <!-- Rank labels (1-8) on the left -->
-                <div class="rank-labels left-ranks" id="left-ranks">
-                    <div class="rank-label">8</div>
-                    <div class="rank-label">7</div>
-                    <div class="rank-label">6</div>
-                    <div class="rank-label">5</div>
-                    <div class="rank-label">4</div>
-                    <div class="rank-label">3</div>
-                    <div class="rank-label">2</div>
-                    <div class="rank-label">1</div>
-                </div>
-                
-                <!-- Main board area -->
-                <div class="board-and-files">
-                    <div class="board-container-inner">
-                        <div class="chess-board" id="chess-board"></div>
-                        <svg class="board-svg-overlay" id="board-svg" viewBox="0 0 480 480">
-                            <defs>
-                                <marker id="arrowhead" markerWidth="10" markerHeight="7" 
-                                        refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" opacity="0.8"/>
-                                </marker>
-                                <marker id="arrowhead-secondary" markerWidth="10" markerHeight="7" 
-                                        refX="9" refY="3.5" orient="auto">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#FF9800" opacity="0.8"/>
-                                </marker>
-                            </defs>
-                        </svg>
-                    </div>
-                    
-                    <!-- File labels (a-h) at the bottom -->
-                    <div class="file-labels bottom-files" id="bottom-files">
-                        <div class="file-label">a</div>
-                        <div class="file-label">b</div>
-                        <div class="file-label">c</div>
-                        <div class="file-label">d</div>
-                        <div class="file-label">e</div>
-                        <div class="file-label">f</div>
-                        <div class="file-label">g</div>
-                        <div class="file-label">h</div>
-                    </div>
-                </div>
-                
-                <!-- Rank labels (1-8) on the right -->
-                <div class="rank-labels right-ranks" id="right-ranks">
-                    <div class="rank-label">8</div>
-                    <div class="rank-label">7</div>
-                    <div class="rank-label">6</div>
-                    <div class="rank-label">5</div>
-                    <div class="rank-label">4</div>
-                    <div class="rank-label">3</div>
-                    <div class="rank-label">2</div>
-                    <div class="rank-label">1</div>
-                </div>
+            <div class="board-container-inner">
+                <div id="chessboard" style="width: 520px;"></div>
+                <svg class="board-svg-overlay" id="board-svg" viewBox="0 0 520 520">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" opacity="0.8"/>
+                        </marker>
+                        <marker id="arrowhead-secondary" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#FF9800" opacity="0.8"/>
+                        </marker>
+                    </defs>
+                </svg>
             </div>
         </div>
         
