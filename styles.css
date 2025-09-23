@@ -851,74 +851,192 @@ body {
     margin-bottom: 10px;
 }
 
-@media (max-width: 600px) {
-    .board-container-inner {
-        width: 320px;
-        height: 320px;
+@media (max-width: 768px) {
+    .game-container {
+        padding: 20px;
+        margin: 10px;
+        max-width: 100%;
+        width: calc(100% - 20px);
     }
     
-    .chess-board {
-        width: 320px;
-        height: 320px;
+    .game-header {
+        margin-bottom: 20px;
     }
     
-    .board-svg-overlay {
-        width: 320px;
-        height: 320px;
+    .game-header h1 {
+        font-size: 2.2rem;
+        margin-bottom: 6px;
     }
     
-    .file-labels {
-        width: 320px;
-    }
-    
-    .rank-labels {
-        height: 320px;
-    }
-    
-    .file-label {
-        height: 20px;
-        font-size: 12px;
-    }
-    
-    .rank-label {
-        width: 20px;
-        font-size: 12px;
-    }
-    
-    .square {
-        width: 40px;
-        height: 40px;
-        font-size: 1.8em;
+    .game-header .subtitle {
+        font-size: 1rem;
+        margin-bottom: 16px;
     }
     
     .game-info {
         grid-template-columns: 1fr;
-        gap: 10px;
+        gap: 12px;
+        padding: 16px;
+        margin-bottom: 20px;
     }
     
-    .game-info-bottom {
-        grid-template-columns: 1fr;
-        gap: 20px;
+    .current-player, .game-status, .game-mode, .ai-info {
+        font-size: 1rem;
+        text-align: center;
     }
     
-    .captured-pieces {
-        flex-direction: column;
+    /* Board sizing for mobile */
+    .board-container-inner {
+        width: 280px;
+        height: 280px;
     }
     
-    /* Mobile button adjustments */
+    .chess-board {
+        width: 280px;
+        height: 280px;
+    }
+    
+    .board-svg-overlay {
+        width: 280px;
+        height: 280px;
+    }
+    
+    .file-labels {
+        width: 280px;
+    }
+    
+    .rank-labels {
+        height: 280px;
+    }
+    
+    .file-label {
+        height: 18px;
+        font-size: 11px;
+    }
+    
+    .rank-label {
+        width: 18px;
+        font-size: 11px;
+    }
+    
+    .square {
+        width: 35px;
+        height: 35px;
+        font-size: 1.6em;
+    }
+    
+    /* Mobile controls */
+    .game-controls {
+        margin: 20px 0;
+    }
+    
+    .primary-controls {
+        margin-bottom: 16px;
+    }
+    
     .btn-primary {
-        min-width: 240px;
-        padding: 16px 28px;
+        min-width: 260px;
+        padding: 16px 24px;
         font-size: 1.1rem;
+    }
+    
+    .primary-description {
+        font-size: 0.85rem;
+        margin-top: 6px;
     }
     
     .secondary-controls {
         gap: 8px;
+        flex-wrap: wrap;
     }
     
     .btn-secondary, .btn-utility {
-        padding: 10px 14px;
+        padding: 10px 16px;
         font-size: 0.85rem;
+        min-width: 80px;
+    }
+    
+    /* Mobile bottom section */
+    .game-info-bottom {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        margin-top: 20px;
+    }
+    
+    .move-notation, .captured-white, .captured-black {
+        padding: 12px;
+        max-height: 200px;
+    }
+    
+    .move-notation h3, .captured-white h3, .captured-black h3 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+    
+    .captured-pieces {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .captured-white, .captured-black {
+        margin: 0;
+    }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 480px) {
+    .game-container {
+        padding: 16px;
+        margin: 5px;
+    }
+    
+    .game-header h1 {
+        font-size: 1.8rem;
+    }
+    
+    .game-header .subtitle {
+        font-size: 0.9rem;
+    }
+    
+    .board-container-inner {
+        width: 240px;
+        height: 240px;
+    }
+    
+    .chess-board {
+        width: 240px;
+        height: 240px;
+    }
+    
+    .board-svg-overlay {
+        width: 240px;
+        height: 240px;
+    }
+    
+    .file-labels {
+        width: 240px;
+    }
+    
+    .rank-labels {
+        height: 240px;
+    }
+    
+    .square {
+        width: 30px;
+        height: 30px;
+        font-size: 1.4em;
+    }
+    
+    .btn-primary {
+        min-width: 220px;
+        padding: 14px 20px;
+        font-size: 1rem;
+    }
+    
+    .btn-secondary, .btn-utility {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        min-width: 70px;
     }
 }
 

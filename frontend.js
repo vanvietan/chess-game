@@ -36,11 +36,11 @@ class ChessGameClient {
         this.enPassantTarget = null; // Square where en passant capture is possible
         this.lastMove = null; // Track last move for en passant
         
-        // Chess piece Unicode symbols
+        // Chess piece Unicode symbols - Outlined style you liked
         this.pieceSymbols = {
             white: {
                 king: '♔', queen: '♕', rook: '♖',
-                bishop: '♗', knight: '♘', pawn: '♙'
+                bishop: '♗', knight: '♘', pawn: '♟'
             },
             black: {
                 king: '♚', queen: '♛', rook: '♜',
