@@ -25,10 +25,9 @@ class ChessGameClient {
         
         this.initializeBoard();
         this.renderBoard();
-        this.updateUI(); // Add this to update the initial UI
+        this.updateUI();
         this.attachEventListeners();
-        // Delay WebSocket initialization to allow board to render first
-        setTimeout(() => this.initializeWebSocket(), 1000);
+        // No backend - pure frontend chess game
     }
     
     initializeBoard() {
@@ -54,186 +53,78 @@ class ChessGameClient {
         }
     }
     
-    initializeWebSocket() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/ws`;
+    // WebSocket functionality removed - pure frontend implementation
+    
+    createGame(mode, aiSettings = null) {
+        // Pure frontend game - no backend needed
+        this.gameId = 'local-' + Math.random().toString(36).substr(2, 9);
+        this.gameMode = mode;
+        this.gameStatus = 'playing';
+        this.currentPlayer = 'white';
         
-        console.log('Attempting WebSocket connection to:', wsUrl);
-        
-        try {
-            this.ws = new WebSocket(wsUrl);
-        } catch (error) {
-            console.error('WebSocket initialization failed:', error);
-            // Continue without WebSocket for static deployment
-            return;
+        if (aiSettings) {
+            this.aiColor = aiSettings.color;
+            this.aiDifficulty = aiSettings.difficulty;
         }
         
-        this.ws.onopen = () => {
-            console.log('WebSocket connected');
-        };
+        // Reset board to starting position
+        this.initializeBoard();
+        this.renderBoard();
+        this.updateUI();
         
-        this.ws.onmessage = (event) => {
-            const message = JSON.parse(event.data);
-            this.handleWebSocketMessage(message);
-        };
+        // If AI plays white, make first move
+        if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
+            setTimeout(() => this.makeRandomAIMove(), 1000);
+        }
         
-        this.ws.onclose = () => {
-            console.log('WebSocket disconnected');
-            // Only try to reconnect if we're in development or the connection was previously established
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                setTimeout(() => this.initializeWebSocket(), 3000);
-            }
-        };
-        
-        this.ws.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            // On production (like Vercel), WebSocket might not be available
-            if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                console.log('Running in production mode - WebSocket features may be limited');
-            }
-        };
+        return true;
     }
     
-    handleWebSocketMessage(message) {
-        switch (message.type) {
-            case 'game_update':
-                this.handleGameUpdate(message.data);
-                break;
-            case 'joined_game':
-                console.log('Joined game:', message.gameId);
-                break;
-            case 'pong':
-                // Handle ping-pong for connection keep-alive
-                break;
-        }
-    }
-    
-    handleGameUpdate(update) {
-        if (update.gameId === this.gameId) {
-            // Update game state based on server update
-            this.updateBoardFromFEN(update.fen);
-            this.currentPlayer = update.currentTurn;
-            this.gameStatus = update.gameStatus;
-            this.updateUI();
-        }
-    }
-    
-    sendWebSocketMessage(message) {
-        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify(message));
-        } else {
-            console.log('WebSocket not available, skipping message:', message);
-        }
-    }
-    
-    async createGame(mode, aiSettings = null) {
-        try {
-            const response = await fetch('/api/games', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    mode: mode,
-                    playerName: 'Player 1',
-                    aiSettings: aiSettings
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                this.gameId = data.gameId;
-                this.gameMode = mode;
-                this.gameStatus = 'playing'; // Set status to playing when game is created
-                if (aiSettings) {
-                    this.aiColor = aiSettings.color;
-                    this.aiDifficulty = aiSettings.difficulty;
-                }
-                
-                // Join the game via WebSocket
-                this.sendWebSocketMessage({
-                    type: 'join_game',
-                    gameId: this.gameId
-                });
-                
-                this.updateUI();
-                
-                // If AI plays white, get AI move
-                if (mode === 'ai' && aiSettings.color === 'white') {
-                    this.requestAIMove();
-                }
-                
-                return true;
-            } else {
-                console.error('Failed to create game:', data.error);
-                return false;
-            }
-        } catch (error) {
-            console.error('Error creating game:', error);
-            return false;
-        }
-    }
-    
-    async makeMove(from, to, promotion = null) {
+    makeMove(from, to, promotion = null) {
         if (!this.gameId) {
             console.error('No active game');
             this.showErrorMessage('No active game');
             return false;
         }
         
-        // Add visual feedback that move is being processed
-        this.showMoveProcessing(true);
+        // Simple move validation and execution for frontend-only version
+        const fromCoords = this.parseSquareNotation(from);
+        const toCoords = this.parseSquareNotation(to);
         
-        try {
-            const response = await fetch(`/api/games/${this.gameId}/moves`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    from: from,
-                    to: to,
-                    promotion: promotion
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                // Clear selection immediately on successful move
-                this.clearSelection();
-                
-                // Update board from server response
-                this.updateBoardFromFEN(data.fen);
-                this.currentPlayer = data.currentTurn;
-                this.gameStatus = data.gameStatus;
-                this.updateUI();
-                
-                // Clear any error messages
-                this.clearErrorMessage();
-                
-                // Check if AI should move next
-                if (this.gameMode === 'ai' && 
-                    this.currentPlayer === this.aiColor && 
-                    this.gameStatus === 'playing') {
-                    this.requestAIMove();
-                }
-                
-                return true;
-            } else {
-                console.error('Invalid move:', data.error);
-                this.showErrorMessage(`Invalid move: ${this.extractMoveError(data.error)}`);
-                return false;
-            }
-        } catch (error) {
-            console.error('Error making move:', error);
-            this.showErrorMessage('Network error occurred');
+        if (!fromCoords || !toCoords) {
+            this.showErrorMessage('Invalid move notation');
             return false;
-        } finally {
-            // Always hide move processing indicator
-            this.showMoveProcessing(false);
         }
+        
+        const piece = this.board[fromCoords.row][fromCoords.col];
+        if (!piece || piece.color !== this.currentPlayer) {
+            this.showErrorMessage('No piece to move or wrong color');
+            return false;
+        }
+        
+        // Execute the move (simplified - no chess rule validation)
+        this.board[toCoords.row][toCoords.col] = piece;
+        this.board[fromCoords.row][fromCoords.col] = null;
+        
+        // Switch players
+        this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
+        
+        // Clear selection
+        this.clearSelection();
+        this.renderBoard();
+        this.updateUI();
+        
+        // Clear any error messages
+        this.clearErrorMessage();
+        
+        // Check if AI should move next
+        if (this.gameMode === 'ai' && 
+            this.currentPlayer === this.aiColor && 
+            this.gameStatus === 'playing') {
+            setTimeout(() => this.makeRandomAIMove(), 1000);
+        }
+        
+        return true;
     }
     
     extractMoveError(errorMessage) {
@@ -284,7 +175,7 @@ class ChessGameClient {
         }
     }
     
-    async requestAIMove() {
+    makeRandomAIMove() {
         if (!this.gameId || this.aiThinking) {
             return;
         }
@@ -292,117 +183,62 @@ class ChessGameClient {
         this.aiThinking = true;
         this.showAIThinking(true);
         
-        try {
-            const response = await fetch(`/api/games/${this.gameId}/ai-move`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    fen: this.getFEN()
-                })
-            });
+        // Get all possible moves for AI color
+        const possibleMoves = this.getAllPossibleMoves(this.aiColor);
+        
+        if (possibleMoves.length > 0) {
+            // Pick a random move
+            const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
             
-            const data = await response.json();
-            
-            if (data.success) {
-                // Make the AI move
-                await this.makeMove(data.from, data.to, data.promotion);
-            } else {
-                console.error('AI move failed:', data.error);
-            }
-        } catch (error) {
-            console.error('Error getting AI move:', error);
-        } finally {
+            // Make the move after a short delay for realism
+            setTimeout(() => {
+                this.makeMove(randomMove.from, randomMove.to);
+                this.aiThinking = false;
+                this.showAIThinking(false);
+            }, 500 + Math.random() * 1000); // Random delay between 0.5-1.5 seconds
+        } else {
             this.aiThinking = false;
             this.showAIThinking(false);
+            console.log('No possible moves for AI');
         }
     }
     
-    updateBoardFromFEN(fen) {
-        // Simple FEN parsing - in a real implementation, you'd use a proper chess library
-        const parts = fen.split(' ');
-        const boardPart = parts[0];
-        const rows = boardPart.split('/');
-        
-        this.board = Array(8).fill(null).map(() => Array(8).fill(null));
+    getAllPossibleMoves(color) {
+        const moves = [];
         
         for (let row = 0; row < 8; row++) {
-            let col = 0;
-            for (let char of rows[row]) {
-                if (char >= '1' && char <= '8') {
-                    col += parseInt(char);
-                } else {
-                    const color = char === char.toUpperCase() ? 'white' : 'black';
-                    const type = this.getTypeFromFENChar(char.toLowerCase());
-                    this.board[row][col] = { type, color };
-                    col++;
-                }
-            }
-        }
-        
-        this.renderBoard();
-    }
-    
-    getTypeFromFENChar(char) {
-        const map = {
-            'p': 'pawn',
-            'r': 'rook',
-            'n': 'knight',
-            'b': 'bishop',
-            'q': 'queen',
-            'k': 'king'
-        };
-        return map[char] || 'pawn';
-    }
-    
-    getFEN() {
-        // Simple FEN generation - in a real implementation, you'd use a proper chess library
-        let fen = '';
-        
-        for (let row = 0; row < 8; row++) {
-            let emptyCount = 0;
-            let rowString = '';
-            
             for (let col = 0; col < 8; col++) {
                 const piece = this.board[row][col];
-                if (piece) {
-                    if (emptyCount > 0) {
-                        rowString += emptyCount;
-                        emptyCount = 0;
-                    }
-                    const char = this.getFENChar(piece.type);
-                    rowString += piece.color === 'white' ? char.toUpperCase() : char.toLowerCase();
-                } else {
-                    emptyCount++;
+                if (piece && piece.color === color) {
+                    const validMoves = this.getValidMovesForPiece(piece, row, col);
+                    validMoves.forEach(move => {
+                        moves.push({
+                            from: this.getSquareNotation(row, col),
+                            to: this.getSquareNotation(move.row, move.col)
+                        });
+                    });
                 }
             }
-            
-            if (emptyCount > 0) {
-                rowString += emptyCount;
-            }
-            
-            fen += rowString;
-            if (row < 7) fen += '/';
         }
         
-        // Add other FEN parts (simplified)
-        fen += ` ${this.currentPlayer.charAt(0)} - - 0 1`;
-        
-        return fen;
+        return moves;
     }
     
-    getFENChar(type) {
-        const map = {
-            'pawn': 'p',
-            'rook': 'r',
-            'knight': 'n',
-            'bishop': 'b',
-            'queen': 'q',
-            'king': 'k'
-        };
-        return map[type] || 'p';
+    parseSquareNotation(notation) {
+        if (!notation || notation.length !== 2) return null;
+        
+        const files = 'abcdefgh';
+        const ranks = '87654321';
+        
+        const col = files.indexOf(notation[0]);
+        const row = ranks.indexOf(notation[1]);
+        
+        if (col === -1 || row === -1) return null;
+        
+        return { row, col };
     }
+    
+    // FEN functionality removed - simplified frontend-only implementation
     
     renderBoard() {
         const boardElement = document.getElementById('chess-board');

@@ -1,26 +1,8 @@
 {
-  "functions": {
-    "api/*.go": {
-      "runtime": "@vercel/go@3.0.3"
-    }
-  },
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/handler.go"
-    },
-    {
-      "src": "/(.*\\.(js|css|html|png|jpg|svg|ico))",
+      "src": "/(.*)",
       "dest": "/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/index.html"
     }
-  ],
-  "env": {
-    "GIN_MODE": "release",
-    "USE_CHESS_API": "true",
-    "CHESS_API_URL": "https://chess-api.com/v1"
-  }
+  ]
 }
