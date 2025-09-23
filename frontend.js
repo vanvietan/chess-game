@@ -1,995 +1,156 @@
 class ChessGameClient {
     constructor() {
+        // Initialize chess.js game engine
+        this.game = new Chess();
+        
+        // Game state
         this.gameId = null;
-        this.board = [];
-        this.currentPlayer = 'white';
-        this.selectedSquare = null;
-        this.gameStatus = 'waiting'; // Changed from 'playing' to 'waiting'
-        this.gameMode = 'pvp';
-        this.aiColor = '';
+        this.gameMode = 'human';
+        this.gameStatus = 'waiting';
+        this.aiColor = 'black';
         this.aiDifficulty = 8;
         this.aiThinking = false;
-        this.ws = null;
         
-        // Board rotation and move history
-        this.boardRotated = false; // false = white on bottom, true = black on bottom
-        this.moveHistory = []; // Store all moves for notation
-        this.fullMoveNumber = 1; // Full move counter
-        
-        // Visual enhancements inspired by gchessboard
-        this.arrows = []; // Store arrows for move visualization
-        this.highlightedSquares = new Set(); // Custom square highlights
-        this.lastMoveHighlight = null; // Highlight last move
-        this.showMoveHighlighting = true; // Toggle for move highlighting
-        
-        // Captured pieces tracking
-        this.capturedPieces = {
-            white: [],
-            black: []
-        };
-        
-        // Track castling rights and en passant
-        this.castlingRights = {
-            white: { kingside: true, queenside: true },
-            black: { kingside: true, queenside: true }
-        };
-        this.enPassantTarget = null; // Square where en passant capture is possible
-        this.lastMove = null; // Track last move for en passant
-        
-        // Chess piece Unicode symbols - All solid/filled style
-        this.pieceSymbols = {
-            white: {
-                king: '♚', queen: '♛', rook: '♜',
-                bishop: '♝', knight: '♞', pawn: '♟'
-            },
-            black: {
-                king: '♚', queen: '♛', rook: '♜',
-                bishop: '♝', knight: '♞', pawn: '♟'
-            }
-        };
-        
-        this.initializeBoard();
-        this.renderBoard();
-        this.updateUI();
-        this.updateCoordinateLabels();
-        this.attachEventListeners();
-        this.setupKeyboardNavigation();
-        // No backend - pure frontend chess game
-    }
-    
-    initializeBoard() {
-        // Initialize empty 8x8 board
-        this.board = Array(8).fill(null).map(() => Array(8).fill(null));
-        
-        // Set up initial chess position
-        const initialSetup = [
-            ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'],
-            ['pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn']
-        ];
-        
-        // Place black pieces
-        for (let col = 0; col < 8; col++) {
-            this.board[0][col] = { type: initialSetup[0][col], color: 'black' };
-            this.board[1][col] = { type: initialSetup[1][col], color: 'black' };
-        }
-        
-        // Place white pieces
-        for (let col = 0; col < 8; col++) {
-            this.board[7][col] = { type: initialSetup[0][col], color: 'white' };
-            this.board[6][col] = { type: initialSetup[1][col], color: 'white' };
-        }
-    }
-    
-    // WebSocket functionality removed - pure frontend implementation
-    
-    createGame(mode, aiSettings = null) {
-        // Pure frontend game - no backend needed
-        this.gameId = 'local-' + Math.random().toString(36).substr(2, 9);
-        this.gameMode = mode;
-        this.gameStatus = 'playing';
-        this.currentPlayer = 'white';
-        
-        if (aiSettings) {
-            this.aiColor = aiSettings.color;
-            this.aiDifficulty = aiSettings.difficulty;
-        }
-        
-        // Reset board to starting position
-        this.initializeBoard();
-        
-        // Reset castling rights and en passant
-        this.castlingRights = {
-            white: { kingside: true, queenside: true },
-            black: { kingside: true, queenside: true }
-        };
-        this.enPassantTarget = null;
-        this.lastMove = null;
+        // UI state
+        this.boardRotated = false;
         this.moveHistory = [];
-        this.fullMoveNumber = 1;
-        this.capturedPieces = {
-            white: [],
-            black: []
-        };
+        this.capturedPieces = { white: [], black: [] };
+        this.showMoveHighlighting = true;
+        this.soundEnabled = true;
         
-        this.renderBoard();
+        
+        // Initialize
+        this.initializeChessboard();
+        this.attachEventListeners();
         this.updateUI();
+        this.updateToggleButtonState();
+        this.updateSoundButtonState();
+        this.setupKeyboardNavigation();
+        this.initializeSoundSystem();
+    }
+    
+    initializeChessboard() {
+        if (typeof Chessboard === 'undefined' || typeof Chess === 'undefined' || typeof $ === 'undefined') {
+            setTimeout(() => this.initializeChessboard(), 100);
+            return;
+        }
+
+        const boardElement = document.getElementById('chessboard');
+        if (!boardElement) {
+            setTimeout(() => this.initializeChessboard(), 100);
+            return;
+        }
+
+        try {
+            this.chessboard = Chessboard('chessboard', {
+                draggable: true,
+                position: 'start',
+                onDragStart: this.onDragStart.bind(this),
+                onDrop: this.onDrop.bind(this),
+                onSnapEnd: this.onSnapEnd.bind(this),
+                pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+                showNotation: true,
+                sparePieces: false
+            });
+            
+        } catch (error) {
+            setTimeout(() => this.initializeChessboard(), 500);
+            return;
+        }
         
-        // If AI plays white, make first move
-        if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
-            setTimeout(() => this.makeStockfishAIMove(), 1000);
+        this.updateUI();
+        }
+        
+    onDragStart(source, piece, position, orientation) {
+        const currentPlayer = this.game.turn() === 'w' ? 'white' : 'black';
+        const pieceColor = piece.charAt(0) === 'w' ? 'white' : 'black';
+    
+        if (pieceColor !== currentPlayer || this.game.game_over() || this.aiThinking) {
+            return false;
         }
         
         return true;
     }
     
-    makeMove(from, to, promotion = null) {
-        if (!this.gameId) {
-            console.error('No active game');
-            this.showErrorMessage('No active game');
-            return false;
+    onDrop(source, target, piece, newPos, oldPos, orientation) {
+        // Check if this is a pawn promotion
+        const isPawnPromotion = (piece.toLowerCase().includes('p') && 
+            ((piece.charAt(0) === 'w' && target.charAt(1) === '8') ||
+             (piece.charAt(0) === 'b' && target.charAt(1) === '1')));
+        
+        let promotionPiece = 'q'; // Default to queen
+        
+        // If it's a promotion, we could show a modal here (simplified to queen for now)
+        if (isPawnPromotion) {
+            // For now, always promote to queen. Could add promotion modal later
+            promotionPiece = 'q';
         }
         
-        // Parse move coordinates
-        const fromCoords = this.parseSquareNotation(from);
-        const toCoords = this.parseSquareNotation(to);
+        const move = this.game.move({
+            from: source,
+            to: target,
+            promotion: promotionPiece
+        });
         
-        if (!fromCoords || !toCoords) {
-            this.showErrorMessage('Invalid move notation');
-            return false;
+        if (move === null) {
+            return 'snapback';
         }
         
-        const piece = this.board[fromCoords.row][fromCoords.col];
-        if (!piece || piece.color !== this.currentPlayer) {
-            this.showErrorMessage('No piece to move or wrong color');
-            return false;
+        this.updateAfterMove(move);
+        return true;
+    }
+    
+    onSnapEnd() {
+        this.chessboard.position(this.game.fen());
+    }
+    
+    updateAfterMove(move) {
+        this.addMoveToHistory(move);
+        
+        if (move.captured) {
+            const capturedPiece = {
+                type: move.captured,
+                color: move.color === 'w' ? 'b' : 'w'
+            };
+            const captureColor = capturedPiece.color === 'w' ? 'white' : 'black';
+            this.capturedPieces[captureColor].push(capturedPiece);
+            this.playSound('capture');
+        } else {
+            this.playSound('move');
         }
         
-        // Validate the move is legal for this piece
-        if (!this.isValidMove(fromCoords, toCoords, piece)) {
-            this.showErrorMessage('Illegal move for this piece');
-            return false;
-        }
-        
-        // Store move info for tracking
-        const moveInfo = {
-            from: from,
-            to: to,
-            piece: piece.type,
-            color: piece.color,
-            fromCoords: fromCoords,
-            toCoords: toCoords,
-            captured: this.board[toCoords.row][toCoords.col]
-        };
-        
-        // Handle special moves before executing
-        const isEnPassant = this.isEnPassantCapture(fromCoords, toCoords, piece);
-        const isCastling = this.isCastlingMove(fromCoords, toCoords, piece);
-        
-        // Execute the move
-        this.board[toCoords.row][toCoords.col] = piece;
-        this.board[fromCoords.row][fromCoords.col] = null;
-        
-        // Handle captured pieces
-        if (moveInfo.captured) {
-            this.capturedPieces[moveInfo.captured.color].push(moveInfo.captured);
-        }
-        
-        // Handle en passant capture
-        if (isEnPassant) {
-            const capturedPawnRow = fromCoords.row;
-            const capturedPawn = this.board[capturedPawnRow][toCoords.col];
-            if (capturedPawn) {
-                this.capturedPieces[capturedPawn.color].push(capturedPawn);
-            }
-            this.board[capturedPawnRow][toCoords.col] = null;
-        }
-        
-        // Handle castling - move the rook
-        if (isCastling) {
-            const isKingside = toCoords.col > fromCoords.col;
-            const rookFromCol = isKingside ? 7 : 0;
-            const rookToCol = isKingside ? 5 : 3;
-            const rook = this.board[fromCoords.row][rookFromCol];
-            this.board[fromCoords.row][rookToCol] = rook;
-            this.board[fromCoords.row][rookFromCol] = null;
-        }
-        
-        // Handle pawn promotion
-        let isPromotion = false;
-        if (piece.type === 'pawn' && (toCoords.row === 0 || toCoords.row === 7)) {
-            isPromotion = true;
-            if (promotion) {
-                // Promotion piece already chosen (e.g., from AI)
-                this.board[toCoords.row][toCoords.col].type = promotion;
-            } else {
-                // Show promotion modal for human player
-                this.showPromotionModal(toCoords.row, toCoords.col);
-                return true; // Exit early, promotion will complete the move
-            }
-        }
-        
-        // Update castling rights
-        this.updateCastlingRights(moveInfo);
-        
-        // Update en passant target
-        this.updateEnPassantTarget(moveInfo);
-        
-        // Store last move
-        this.lastMove = moveInfo;
-        
-        // Add move to history for notation (only if not a promotion waiting for user input)
-        if (!isPromotion || promotion) {
-            this.addMoveToHistory(moveInfo, isEnPassant, isCastling, promotion);
-        }
-        
-        // Update last move highlight
-        this.updateLastMoveHighlight(fromCoords, toCoords);
-        
-        // Switch players
-        this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
-        
-        // Clear selection
-        this.clearSelection();
-        this.renderBoard();
         this.updateUI();
+        this.updateMoveHighlighting(move);
         
         // Clear any error messages
         this.clearErrorMessage();
         
-        console.log(`Move made: ${from} -> ${to}`);
-        
-        // Check if AI should move next
-        if (this.gameMode === 'ai' && 
-            this.currentPlayer === this.aiColor && 
-            this.gameStatus === 'playing') {
-            setTimeout(() => this.makeStockfishAIMove(), 1000);
-        }
-        
-        return true;
-    }
-    
-    extractMoveError(errorMessage) {
-        // Extract a user-friendly error from the technical error message
-        if (errorMessage.includes('could not decode algebraic notation')) {
-            return 'That move is not legal in the current position';
-        }
-        if (errorMessage.includes('Game not found')) {
-            return 'Game session has expired';
-        }
-        return 'Move not allowed';
-    }
-    
-    showErrorMessage(message) {
-        // Remove any existing error message
-        this.clearErrorMessage();
-        
-        // Create and show error message
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        errorDiv.textContent = message;
-        errorDiv.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background-color: #ff6b6b;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            z-index: 1000;
-            font-weight: bold;
-            animation: slideIn 0.3s ease-out;
-        `;
-        
-        document.body.appendChild(errorDiv);
-        
-        // Auto-remove after 3 seconds
-        setTimeout(() => {
-            this.clearErrorMessage();
-        }, 3000);
-    }
-    
-    clearErrorMessage() {
-        const existing = document.querySelector('.error-message');
-        if (existing) {
-            existing.remove();
-        }
-    }
-    
-    async makeStockfishAIMove() {
-        if (!this.gameId || this.aiThinking) {
+        // Check for game state sounds
+        if (this.game.game_over()) {
+            if (this.game.in_checkmate()) {
+                this.playSound('checkmate');
+            }
+            this.handleGameOver();
             return;
+        } else if (this.game.in_check()) {
+            this.playSound('check');
         }
         
-        this.aiThinking = true;
-        this.showAIThinking(true);
-        
-        try {
-            // Get current position in FEN format
-            const fen = this.generateFEN();
-            
-            // Calculate depth based on difficulty (1-20 maps to 1-18)
-            const depth = Math.min(Math.max(this.aiDifficulty, 1), 18);
-            
-            console.log(`AI thinking... Difficulty: ${this.aiDifficulty}, Depth: ${depth}`);
-            
-            // Call Chess-API.com for Stockfish analysis
-            const response = await fetch('https://chess-api.com/v1', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    fen: fen,
-                    depth: depth,
-                    maxThinkingTime: 50 + (this.aiDifficulty * 5) // More thinking time for higher difficulty
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data && data.move) {
-                // Parse the move from Chess-API (e.g., "e2e4" format)
-                const move = data.move;
-                const from = move.substring(0, 2);
-                const to = move.substring(2, 4);
-                const promotion = move.length > 4 ? move.substring(4) : null;
-                
-                console.log(`Stockfish suggests: ${from} -> ${to} (eval: ${data.eval}, depth: ${data.depth})`);
-                
-                // Make the AI move
-                this.makeMove(from, to, promotion);
-            } else {
-                console.error('No valid move from Chess-API, falling back to random');
-                this.makeRandomAIMove();
-            }
-        } catch (error) {
-            console.error('Chess-API error, falling back to random move:', error);
-            this.makeRandomAIMove();
-        } finally {
-            this.aiThinking = false;
-            this.showAIThinking(false);
-        }
-    }
-    
-    makeRandomAIMove() {
-        // Fallback function for when Chess-API is unavailable
-        const possibleMoves = this.getAllPossibleMoves(this.aiColor);
-        
-        if (possibleMoves.length > 0) {
-            const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-            setTimeout(() => {
-                this.makeMove(randomMove.from, randomMove.to);
-            }, 500 + Math.random() * 1000);
-        } else {
-            console.log('No possible moves for AI');
-        }
-    }
-    
-    getAllPossibleMoves(color) {
-        const moves = [];
-        
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                const piece = this.board[row][col];
-                if (piece && piece.color === color) {
-                    const validMoves = this.getValidMovesForPiece(piece, row, col);
-                    validMoves.forEach(move => {
-                        moves.push({
-                            from: this.getSquareNotation(row, col),
-                            to: this.getSquareNotation(move.row, move.col)
-                        });
-                    });
-                }
-            }
-        }
-        
-        return moves;
-    }
-    
-    parseSquareNotation(notation) {
-        if (!notation || notation.length !== 2) return null;
-        
-        const files = 'abcdefgh';
-        const ranks = '87654321';
-        
-        const col = files.indexOf(notation[0]);
-        const row = ranks.indexOf(notation[1]);
-        
-        if (col === -1 || row === -1) return null;
-        
-        return { row, col };
-    }
-    
-    isValidMove(fromCoords, toCoords, piece) {
-        const { row: fromRow, col: fromCol } = fromCoords;
-        const { row: toRow, col: toCol } = toCoords;
-        
-        // Can't move to same square
-        if (fromRow === toRow && fromCol === toCol) return false;
-        
-        // Can't capture own piece
-        const targetPiece = this.board[toRow][toCol];
-        if (targetPiece && targetPiece.color === piece.color) return false;
-        
-        // Check piece-specific movement rules
-        switch (piece.type) {
-            case 'pawn':
-                return this.isValidPawnMove(fromRow, fromCol, toRow, toCol, piece.color);
-            case 'rook':
-                return this.isValidRookMove(fromRow, fromCol, toRow, toCol);
-            case 'knight':
-                return this.isValidKnightMove(fromRow, fromCol, toRow, toCol);
-            case 'bishop':
-                return this.isValidBishopMove(fromRow, fromCol, toRow, toCol);
-            case 'queen':
-                return this.isValidQueenMove(fromRow, fromCol, toRow, toCol);
-            case 'king':
-                return this.isValidKingMove(fromRow, fromCol, toRow, toCol);
-            default:
-                return false;
-        }
-    }
-    
-    isValidPawnMove(fromRow, fromCol, toRow, toCol, color) {
-        const direction = color === 'white' ? -1 : 1;
-        const startRow = color === 'white' ? 6 : 1;
-        const rowDiff = toRow - fromRow;
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        // Forward move
-        if (fromCol === toCol) {
-            // One square forward
-            if (rowDiff === direction && !this.board[toRow][toCol]) {
-                return true;
-            }
-            // Two squares forward from starting position
-            if (fromRow === startRow && rowDiff === 2 * direction && !this.board[toRow][toCol]) {
-                return true;
-            }
-        }
-        // Diagonal capture
-        else if (colDiff === 1 && rowDiff === direction) {
-            // Regular capture
-            if (this.board[toRow][toCol] != null) {
-                return true;
-            }
-            // En passant capture
-            if (this.enPassantTarget && 
-                this.getSquareNotation(toRow, toCol) === this.enPassantTarget) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-    
-    isValidRookMove(fromRow, fromCol, toRow, toCol) {
-        // Must move in straight line (horizontal or vertical)
-        if (fromRow !== toRow && fromCol !== toCol) return false;
-        
-        // Check path is clear
-        return this.isPathClear(fromRow, fromCol, toRow, toCol);
-    }
-    
-    isValidKnightMove(fromRow, fromCol, toRow, toCol) {
-        const rowDiff = Math.abs(toRow - fromRow);
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        // Knight moves in L-shape: 2+1 or 1+2
-        return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
-    }
-    
-    isValidBishopMove(fromRow, fromCol, toRow, toCol) {
-        const rowDiff = Math.abs(toRow - fromRow);
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        // Must move diagonally
-        if (rowDiff !== colDiff) return false;
-        
-        // Check path is clear
-        return this.isPathClear(fromRow, fromCol, toRow, toCol);
-    }
-    
-    isValidQueenMove(fromRow, fromCol, toRow, toCol) {
-        // Queen combines rook and bishop moves
-        return this.isValidRookMove(fromRow, fromCol, toRow, toCol) || 
-               this.isValidBishopMove(fromRow, fromCol, toRow, toCol);
-    }
-    
-    isValidKingMove(fromRow, fromCol, toRow, toCol) {
-        const rowDiff = Math.abs(toRow - fromRow);
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        // Normal king move - one square in any direction
-        if (rowDiff <= 1 && colDiff <= 1) {
-            return true;
-        }
-        
-        // Check for castling
-        if (rowDiff === 0 && colDiff === 2) {
-            return this.canCastle(fromRow, fromCol, toRow, toCol);
-        }
-        
-        return false;
-    }
-    
-    isPathClear(fromRow, fromCol, toRow, toCol) {
-        const rowStep = toRow > fromRow ? 1 : toRow < fromRow ? -1 : 0;
-        const colStep = toCol > fromCol ? 1 : toCol < fromCol ? -1 : 0;
-        
-        let currentRow = fromRow + rowStep;
-        let currentCol = fromCol + colStep;
-        
-        // Check each square in the path (excluding start and end)
-        while (currentRow !== toRow || currentCol !== toCol) {
-            if (this.board[currentRow][currentCol] != null) {
-                return false; // Path is blocked
-            }
-            currentRow += rowStep;
-            currentCol += colStep;
-        }
-        
-        return true;
-    }
-    
-    generateFEN() {
-        // Generate FEN string from current board position
-        let fen = '';
-        
-        // 1. Piece placement
-        for (let row = 0; row < 8; row++) {
-            let emptyCount = 0;
-            let rowString = '';
-            
-            for (let col = 0; col < 8; col++) {
-                const piece = this.board[row][col];
-                if (piece) {
-                    if (emptyCount > 0) {
-                        rowString += emptyCount;
-                        emptyCount = 0;
-                    }
-                    const char = this.getFENChar(piece.type);
-                    rowString += piece.color === 'white' ? char.toUpperCase() : char.toLowerCase();
-                } else {
-                    emptyCount++;
-                }
-            }
-            
-            if (emptyCount > 0) {
-                rowString += emptyCount;
-            }
-            
-            fen += rowString;
-            if (row < 7) fen += '/';
-        }
-        
-        // 2. Active color
-        fen += ` ${this.currentPlayer.charAt(0)}`;
-        
-        // 3. Castling availability (simplified - assume none for now)
-        fen += ' -';
-        
-        // 4. En passant target square (simplified - assume none)
-        fen += ' -';
-        
-        // 5. Halfmove clock (simplified)
-        fen += ' 0';
-        
-        // 6. Fullmove number (simplified)
-        fen += ' 1';
-        
-        return fen;
-    }
-    
-    getFENChar(type) {
-        const map = {
-            'pawn': 'p',
-            'rook': 'r',
-            'knight': 'n',
-            'bishop': 'b',
-            'queen': 'q',
-            'king': 'k'
-        };
-        return map[type] || 'p';
-    }
-    
-    // Castling helper functions
-    canCastle(fromRow, fromCol, toRow, toCol) {
-        const color = this.currentPlayer;
-        const isKingside = toCol > fromCol;
-        
-        // Check if castling rights are still available
-        if (!this.castlingRights[color][isKingside ? 'kingside' : 'queenside']) {
-            return false;
-        }
-        
-        // Check if path is clear
-        const startCol = Math.min(fromCol, toCol);
-        const endCol = Math.max(fromCol, toCol);
-        for (let col = startCol + 1; col < endCol; col++) {
-            if (this.board[fromRow][col] != null) {
-                return false;
-            }
-        }
-        
-        // For queenside castling, also check the b-file
-        if (!isKingside && this.board[fromRow][1] != null) {
-            return false;
-        }
-        
-        // Check if king is in check (castling not allowed when in check)
-        if (this.isKingInCheck(color)) {
-            return false;
-        }
-        
-        // Check if king would pass through check during castling
-        const kingRow = fromRow;
-        const step = isKingside ? 1 : -1;
-        
-        // Check each square the king passes through
-        for (let col = fromCol + step; col !== toCol + step; col += step) {
-            // Temporarily move king to this square and check if it would be in check
-            if (this.wouldKingBeInCheckAt(color, kingRow, col)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    isCastlingMove(fromCoords, toCoords, piece) {
-        if (piece.type !== 'king') return false;
-        const colDiff = Math.abs(toCoords.col - fromCoords.col);
-        return colDiff === 2;
-    }
-    
-    // Check detection functions
-    isKingInCheck(color) {
-        // Find the king's position
-        const kingPos = this.findKing(color);
-        if (!kingPos) return false;
-        
-        return this.isSquareUnderAttack(kingPos.row, kingPos.col, color);
-    }
-    
-    wouldKingBeInCheckAt(color, row, col) {
-        // Check if king would be under attack at the given position
-        return this.isSquareUnderAttack(row, col, color);
-    }
-    
-    findKing(color) {
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
-                const piece = this.board[row][col];
-                if (piece && piece.type === 'king' && piece.color === color) {
-                    return { row, col };
-                }
-            }
-        }
-        return null;
-    }
-    
-    isSquareUnderAttack(row, col, kingColor) {
-        const opponentColor = kingColor === 'white' ? 'black' : 'white';
-        
-        // Check if any opponent piece can attack this square
-        for (let fromRow = 0; fromRow < 8; fromRow++) {
-            for (let fromCol = 0; fromCol < 8; fromCol++) {
-                const piece = this.board[fromRow][fromCol];
-                if (piece && piece.color === opponentColor) {
-                    if (this.canPieceAttackSquare(fromRow, fromCol, row, col, piece)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-    
-    canPieceAttackSquare(fromRow, fromCol, toRow, toCol, piece) {
-        // Check if a piece can attack a specific square (similar to movement but ignoring king safety)
-        const rowDiff = Math.abs(toRow - fromRow);
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        switch (piece.type) {
-            case 'pawn':
-                return this.canPawnAttackSquare(fromRow, fromCol, toRow, toCol, piece.color);
-            case 'rook':
-                return (rowDiff === 0 || colDiff === 0) && this.isPathClear(fromRow, fromCol, toRow, toCol);
-            case 'bishop':
-                return rowDiff === colDiff && this.isPathClear(fromRow, fromCol, toRow, toCol);
-            case 'queen':
-                return (rowDiff === 0 || colDiff === 0 || rowDiff === colDiff) && 
-                       this.isPathClear(fromRow, fromCol, toRow, toCol);
-            case 'knight':
-                return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
-            case 'king':
-                return rowDiff <= 1 && colDiff <= 1 && (rowDiff > 0 || colDiff > 0);
-            default:
-                return false;
-        }
-    }
-    
-    canPawnAttackSquare(fromRow, fromCol, toRow, toCol, color) {
-        const direction = color === 'white' ? -1 : 1;
-        const rowDiff = toRow - fromRow;
-        const colDiff = Math.abs(toCol - fromCol);
-        
-        // Pawns attack diagonally one square forward
-        return rowDiff === direction && colDiff === 1;
-    }
-    
-    updateCastlingRights(moveInfo) {
-        const { piece, color, fromCoords, toCoords } = moveInfo;
-        
-        // King moves remove all castling rights
-        if (piece === 'king') {
-            this.castlingRights[color].kingside = false;
-            this.castlingRights[color].queenside = false;
-        }
-        
-        // Rook moves remove castling rights for that side
-        if (piece === 'rook') {
-            if (fromCoords.col === 0) { // Queenside rook
-                this.castlingRights[color].queenside = false;
-            } else if (fromCoords.col === 7) { // Kingside rook
-                this.castlingRights[color].kingside = false;
-            }
-        }
-        
-        // Capturing a rook removes opponent's castling rights
-        if (moveInfo.captured && moveInfo.captured.type === 'rook') {
-            const opponentColor = color === 'white' ? 'black' : 'white';
-            if (toCoords.col === 0) {
-                this.castlingRights[opponentColor].queenside = false;
-            } else if (toCoords.col === 7) {
-                this.castlingRights[opponentColor].kingside = false;
+        if (this.gameMode === 'ai') {
+            const currentPlayer = this.game.turn() === 'w' ? 'white' : 'black';
+            if (currentPlayer === this.aiColor) {
+                setTimeout(() => this.makeStockfishAIMove(), 500);
             }
         }
     }
     
-    // En passant helper functions
-    isEnPassantCapture(fromCoords, toCoords, piece) {
-        if (piece.type !== 'pawn') return false;
-        
-        const colDiff = Math.abs(toCoords.col - fromCoords.col);
-        if (colDiff !== 1) return false;
-        
-        // Check if moving to en passant target square
-        return this.enPassantTarget && 
-               this.getSquareNotation(toCoords.row, toCoords.col) === this.enPassantTarget;
-    }
-    
-    updateEnPassantTarget(moveInfo) {
-        const { piece, color, fromCoords, toCoords } = moveInfo;
-        
-        // Clear previous en passant target
-        this.enPassantTarget = null;
-        
-        // Set en passant target if pawn moved two squares
-        if (piece === 'pawn') {
-            const rowDiff = Math.abs(toCoords.row - fromCoords.row);
-            if (rowDiff === 2) {
-                // En passant target is the square the pawn passed over
-                const targetRow = (fromCoords.row + toCoords.row) / 2;
-                this.enPassantTarget = this.getSquareNotation(targetRow, toCoords.col);
-            }
-        }
-    }
-    
-    renderBoard() {
-        const boardElement = document.getElementById('chess-board');
-        if (!boardElement) {
-            console.error('Chess board element not found!');
-            return;
-        }
-        
-        console.log('Rendering board...', this.board); // Debug log
-        boardElement.innerHTML = '';
-        
-        for (let displayRow = 0; displayRow < 8; displayRow++) {
-            for (let displayCol = 0; displayCol < 8; displayCol++) {
-                // Get logical coordinates based on rotation
-                const { row, col } = this.getLogicalCoords(displayRow, displayCol);
-                
-                const square = document.createElement('div');
-                square.className = `square ${(displayRow + displayCol) % 2 === 0 ? 'light' : 'dark'}`;
-                // Store logical coordinates in dataset
-                square.dataset.row = row;
-                square.dataset.col = col;
-                
-                const piece = this.board[row][col];
-                if (piece) {
-                    const pieceElement = document.createElement('span');
-                    pieceElement.className = `piece piece-${piece.color} piece-${piece.type}`;
-                    pieceElement.textContent = this.pieceSymbols[piece.color][piece.type];
-                    square.appendChild(pieceElement);
-                }
-                
-                square.addEventListener('click', (e) => this.handleSquareClick(e));
-                boardElement.appendChild(square);
-            }
-        }
-        
-        console.log('Board rendered with', boardElement.children.length, 'squares'); // Debug log
-        
-        // Update UI hints after rendering
-        setTimeout(() => this.updateBoardHints(), 100);
-    }
-    
-    handleSquareClick(event) {
-        if (this.gameStatus !== 'playing' || this.aiThinking) {
-            return;
-        }
-        
-        const square = event.currentTarget;
-        const row = parseInt(square.dataset.row);
-        const col = parseInt(square.dataset.col);
-        const piece = this.board[row][col];
-        
-        if (this.selectedSquare) {
-            // Trying to make a move
-            const fromSquare = this.selectedSquare;
-            const toSquare = this.getSquareNotation(row, col);
-            const fromNotation = this.getSquareNotation(fromSquare.row, fromSquare.col);
-            
-            if (fromNotation !== toSquare) {
-                // Attempt the move - selection will be cleared in makeMove
-                this.makeMove(fromNotation, toSquare);
-            } else {
-                // Clicking on the same square - just clear selection
-                this.clearSelection();
-            }
-        } else if (piece && piece.color === this.currentPlayer) {
-            // Selecting a piece
-            if (this.gameMode === 'ai' && this.currentPlayer === this.aiColor) {
-                return; // Don't allow human to move AI pieces
-            }
-            
-            this.selectedSquare = { row, col };
-            this.highlightSquare(square);
-        }
-    }
-    
-    getSquareNotation(row, col) {
-        const files = 'abcdefgh';
-        const ranks = '87654321';
-        return files[col] + ranks[row];
-    }
-    
-    // Get display coordinates for board rendering (handles rotation)
-    getDisplayCoords(row, col) {
-        if (this.boardRotated) {
-            return {
-                displayRow: 7 - row,
-                displayCol: 7 - col
-            };
-        }
-        return {
-            displayRow: row,
-            displayCol: col
-        };
-    }
-    
-    // Convert display coordinates back to logical coordinates
-    getLogicalCoords(displayRow, displayCol) {
-        if (this.boardRotated) {
-            return {
-                row: 7 - displayRow,
-                col: 7 - displayCol
-            };
-        }
-        return {
-            row: displayRow,
-            col: displayCol
-        };
-    }
-    
-    // Board rotation function
-    rotateBoard() {
-        this.boardRotated = !this.boardRotated;
-        this.clearSelection();
-        this.renderBoard();
-        this.updateCoordinateLabels();
-        console.log('Board rotated:', this.boardRotated ? 'Black on bottom' : 'White on bottom');
-    }
-    
-    // Update coordinate labels based on board rotation
-    updateCoordinateLabels() {
-        const files = this.boardRotated ? ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'] : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-        const ranks = this.boardRotated ? ['1', '2', '3', '4', '5', '6', '7', '8'] : ['8', '7', '6', '5', '4', '3', '2', '1'];
-        
-        // Update file labels (bottom only)
-        const bottomFiles = document.querySelectorAll('#bottom-files .file-label');
-        
-        bottomFiles.forEach((label, index) => {
-            label.textContent = files[index];
-        });
-        
-        // Update rank labels (left and right)
-        const leftRanks = document.querySelectorAll('#left-ranks .rank-label');
-        const rightRanks = document.querySelectorAll('#right-ranks .rank-label');
-        
-        leftRanks.forEach((label, index) => {
-            label.textContent = ranks[index];
-        });
-        
-        rightRanks.forEach((label, index) => {
-            label.textContent = ranks[index];
-        });
-    }
-    
-    // Chess notation functions
-    addMoveToHistory(moveInfo, isEnPassant, isCastling, promotion) {
-        const notation = this.generateMoveNotation(moveInfo, isEnPassant, isCastling, promotion);
-        
+    addMoveToHistory(move) {
         this.moveHistory.push({
-            from: moveInfo.from,
-            to: moveInfo.to,
-            notation: notation,
-            color: moveInfo.color,
-            moveNumber: this.fullMoveNumber
+            move: move.san,
+            color: move.color === 'w' ? 'white' : 'black',
+            moveNumber: Math.ceil(this.game.history().length / 2)
         });
-        
-        // Increment full move number after black moves
-        if (moveInfo.color === 'black') {
-            this.fullMoveNumber++;
-        }
-        
         this.updateMoveHistoryDisplay();
-    }
-    
-    generateMoveNotation(moveInfo, isEnPassant, isCastling, promotion) {
-        const { piece, color, from, to, captured } = moveInfo;
-        
-        // Handle castling
-        if (isCastling) {
-            const toCol = this.parseSquareNotation(to).col;
-            return toCol > 4 ? 'O-O' : 'O-O-O'; // Kingside or queenside
-        }
-        
-        let notation = '';
-        
-        // Piece letter (except for pawns)
-        if (piece !== 'pawn') {
-            const pieceLetters = {
-                'king': 'K', 'queen': 'Q', 'rook': 'R',
-                'bishop': 'B', 'knight': 'N'
-            };
-            notation += pieceLetters[piece];
-        }
-        
-        // For disambiguating moves (simplified - could be enhanced)
-        // This would need more complex logic to check for ambiguous moves
-        
-        // Capture notation
-        if (captured || isEnPassant) {
-            if (piece === 'pawn') {
-                notation += from[0]; // File of capturing pawn
-            }
-            notation += 'x';
-        }
-        
-        // Destination square
-        notation += to;
-        
-        // En passant
-        if (isEnPassant) {
-            notation += ' e.p.';
-        }
-        
-        // Promotion
-        if (promotion) {
-            const pieceLetters = {
-                'queen': 'Q', 'rook': 'R', 'bishop': 'B', 'knight': 'N'
-            };
-            notation += '=' + pieceLetters[promotion];
-        }
-        
-        // TODO: Add check/checkmate indicators (+, #)
-        
-        return notation;
     }
     
     updateMoveHistoryDisplay() {
@@ -998,611 +159,654 @@ class ChessGameClient {
         
         historyElement.innerHTML = '';
         
-        // Group moves by full move number
-        const groupedMoves = {};
-        this.moveHistory.forEach(move => {
-            if (!groupedMoves[move.moveNumber]) {
-                groupedMoves[move.moveNumber] = {};
-            }
-            groupedMoves[move.moveNumber][move.color] = move;
-        });
+        for (let i = 0; i < this.moveHistory.length; i += 2) {
+            const moveNumber = Math.floor(i / 2) + 1;
+            const whiteMove = this.moveHistory[i];
+            const blackMove = this.moveHistory[i + 1];
+            
+            const moveNumberEl = document.createElement('div');
+            moveNumberEl.className = 'move-number';
+            moveNumberEl.textContent = moveNumber + '.';
+            historyElement.appendChild(moveNumberEl);
+            
+            const whiteMoveEl = document.createElement('div');
+            whiteMoveEl.className = 'move-white';
+            whiteMoveEl.textContent = whiteMove ? whiteMove.move : '';
+            historyElement.appendChild(whiteMoveEl);
+            
+            const blackMoveEl = document.createElement('div');
+            blackMoveEl.className = 'move-black';
+            blackMoveEl.textContent = blackMove ? blackMove.move : '';
+            historyElement.appendChild(blackMoveEl);
+        }
         
-        // Display moves
-        Object.keys(groupedMoves).forEach(moveNum => {
-            const moves = groupedMoves[moveNum];
-            
-            // Move number
-            const numberElement = document.createElement('div');
-            numberElement.className = 'move-number';
-            numberElement.textContent = moveNum + '.';
-            historyElement.appendChild(numberElement);
-            
-            // White move
-            const whiteElement = document.createElement('div');
-            whiteElement.className = 'move-white';
-            whiteElement.textContent = moves.white ? moves.white.notation : '';
-            if (moves.white) {
-                whiteElement.title = `${moves.white.from} → ${moves.white.to}`;
-            }
-            historyElement.appendChild(whiteElement);
-            
-            // Black move
-            const blackElement = document.createElement('div');
-            blackElement.className = 'move-black';
-            blackElement.textContent = moves.black ? moves.black.notation : '';
-            if (moves.black) {
-                blackElement.title = `${moves.black.from} → ${moves.black.to}`;
-            }
-            historyElement.appendChild(blackElement);
-        });
-        
-        // Auto-scroll to bottom
         historyElement.scrollTop = historyElement.scrollHeight;
     }
     
-    // Enhanced visual features inspired by gchessboard
-    drawArrow(fromSquare, toSquare, brush = 'primary') {
-        const svg = document.getElementById('board-svg');
-        if (!svg) return;
+    updateMoveHighlighting(move) {
+        if (!this.showMoveHighlighting) return;
         
-        const fromCoords = this.parseSquareNotation(fromSquare);
-        const toCoords = this.parseSquareNotation(toSquare);
-        if (!fromCoords || !toCoords) return;
-        
-        // Convert to display coordinates
-        const fromDisplay = this.getDisplayCoords(fromCoords.row, fromCoords.col);
-        const toDisplay = this.getDisplayCoords(toCoords.row, toCoords.col);
-        
-        // Calculate pixel positions (60px per square)
-        const fromX = (fromDisplay.displayCol * 60) + 30;
-        const fromY = (fromDisplay.displayRow * 60) + 30;
-        const toX = (toDisplay.displayCol * 60) + 30;
-        const toY = (toDisplay.displayRow * 60) + 30;
-        
-        // Create arrow line
-        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.setAttribute('x1', fromX);
-        line.setAttribute('y1', fromY);
-        line.setAttribute('x2', toX);
-        line.setAttribute('y2', toY);
-        line.setAttribute('stroke', brush === 'secondary' ? '#FF9800' : '#4CAF50');
-        line.setAttribute('stroke-width', '6');
-        line.setAttribute('stroke-linecap', 'round');
-        line.setAttribute('opacity', '0.8');
-        line.setAttribute('marker-end', `url(#arrowhead${brush === 'secondary' ? '-secondary' : ''})`);
-        line.classList.add('board-arrow', `arrow-${brush}`);
-        
-        svg.appendChild(line);
-        
-        // Store arrow data
-        this.arrows.push({
-            from: fromSquare,
-            to: toSquare,
-            brush: brush,
-            element: line
-        });
-    }
-    
-    clearArrows() {
-        const svg = document.getElementById('board-svg');
-        if (!svg) return;
-        
-        // Remove all arrow elements
-        const arrows = svg.querySelectorAll('.board-arrow');
-        arrows.forEach(arrow => arrow.remove());
-        
-        // Clear arrows array
-        this.arrows = [];
-    }
-    
-    updateLastMoveHighlight(fromCoords, toCoords) {
-        // Store the last move coordinates for toggling
-        this.lastMoveHighlight = { fromCoords, toCoords };
-        
-        // Apply highlighting if enabled
-        this.applyMoveHighlighting();
-    }
-    
-    applyMoveHighlighting() {
-        // Clear previous highlights and arrows
         this.clearMoveHighlighting();
         
-        // Only apply if highlighting is enabled and we have a last move
-        if (!this.showMoveHighlighting || !this.lastMoveHighlight) {
-            return;
-        }
-        
-        const { fromCoords, toCoords } = this.lastMoveHighlight;
-        
-        // Add last move highlight to from and to squares
-        const fromSquare = document.querySelector(`[data-row="${fromCoords.row}"][data-col="${fromCoords.col}"]`);
-        const toSquare = document.querySelector(`[data-row="${toCoords.row}"][data-col="${toCoords.col}"]`);
-        
-        if (fromSquare) fromSquare.classList.add('last-move');
-        if (toSquare) toSquare.classList.add('last-move');
-        
-        // Draw arrow for the last move
-        const fromNotation = this.getSquareNotation(fromCoords.row, fromCoords.col);
-        const toNotation = this.getSquareNotation(toCoords.row, toCoords.col);
-        this.drawArrow(fromNotation, toNotation, 'primary');
+        setTimeout(() => {
+            const fromSquare = document.querySelector('[data-square="' + move.from + '"]');
+            const toSquare = document.querySelector('[data-square="' + move.to + '"]');
+            
+            if (fromSquare) fromSquare.classList.add('last-move');
+            if (toSquare) toSquare.classList.add('last-move');
+        }, 100);
     }
     
     clearMoveHighlighting() {
-        // Clear previous last move highlights
-        document.querySelectorAll('.square.last-move').forEach(sq => {
-            sq.classList.remove('last-move');
+        document.querySelectorAll('.last-move').forEach(square => {
+            square.classList.remove('last-move');
         });
-        
-        // Clear arrows
-        this.clearArrows();
     }
     
     toggleMoveHighlighting() {
         this.showMoveHighlighting = !this.showMoveHighlighting;
-        this.applyMoveHighlighting();
         this.updateToggleButtonState();
         
-        console.log('Move highlighting:', this.showMoveHighlighting ? 'enabled' : 'disabled');
+        if (!this.showMoveHighlighting) {
+            this.clearMoveHighlighting();
+        }
     }
     
     updateToggleButtonState() {
-        const toggleBtn = document.getElementById('toggle-move-highlight-btn');
-        const toggleIcon = toggleBtn.querySelector('.toggle-icon');
-        
-        if (this.showMoveHighlighting) {
-            toggleBtn.classList.add('active');
-            toggleBtn.innerHTML = '<span class="toggle-icon">👁️</span> Show Moves';
+        const button = document.getElementById('toggle-move-highlight-btn');
+        if (button) {
+            if (this.showMoveHighlighting) {
+                button.classList.add('active');
+                button.title = 'Disable move highlighting';
         } else {
-            toggleBtn.classList.remove('active');
-            toggleBtn.innerHTML = '<span class="toggle-icon">🙈</span> Hide Moves';
+                button.classList.remove('active');
+                button.title = 'Enable move highlighting';
+            }
         }
     }
     
-    // Add suggested moves visualization
-    showSuggestedMoves(moves) {
-        // Clear previous suggestions
-        document.querySelectorAll('.square.suggested-move').forEach(sq => {
-            sq.classList.remove('suggested-move');
-        });
+    createGame(mode = 'human', aiSettings = null) {
+        this.gameId = 'local-' + Math.random().toString(36).substr(2, 9);
+        this.gameMode = mode;
+        this.gameStatus = 'playing';
         
-        // Add suggestions
-        moves.forEach(move => {
-            const coords = this.parseSquareNotation(move.to);
-            if (coords) {
-                const square = document.querySelector(`[data-row="${coords.row}"][data-col="${coords.col}"]`);
-                if (square) {
-                    square.classList.add('suggested-move');
+        if (aiSettings) {
+            this.aiColor = aiSettings.color;
+            this.aiDifficulty = aiSettings.difficulty;
+        }
+        
+        this.game.reset();
+        this.moveHistory = [];
+        this.capturedPieces = { white: [], black: [] };
+        
+        if (this.chessboard) {
+            this.chessboard.position('start');
+            console.log('Chessboard position set to start');
+        } else {
+            console.error('Chessboard not initialized when creating game');
+            // Try to reinitialize
+            this.initializeChessboard();
+        return false;
+    }
+        
+        this.updateUI();
+        this.updateMoveHistoryDisplay();
+        this.updateGameIdDisplay();
+        this.clearMoveHighlighting();
+        this.clearErrorMessage();
+        
+        // Play game start sound
+        this.playSound('gameStart');
+        
+        if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
+            if (this.chessboard) {
+                this.chessboard.flip();
+            }
+            setTimeout(() => this.makeStockfishAIMove(), 1000);
+        }
+        
+        return true;
+    }
+    
+    async makeStockfishAIMove() {
+        if (this.aiThinking || this.game.game_over()) return;
+        
+        this.aiThinking = true;
+        this.updateUI();
+        
+        try {
+            // Get current position in FEN format
+            const fen = this.game.fen();
+            const moves = this.game.moves({ verbose: true });
+            
+            if (moves.length === 0) {
+                this.aiThinking = false;
+                this.updateUI();
+                return;
+            }
+            
+            
+            // Use real Stockfish 17 API from chess-api.com
+            let bestMove;
+            try {
+                const apiResponse = await this.getStockfishMove(fen, this.aiDifficulty);
+                if (apiResponse && apiResponse.move) {
+                    // Convert API move format (e.g., "e2e4") to chess.js format
+                    const fromSquare = apiResponse.move.substring(0, 2);
+                    const toSquare = apiResponse.move.substring(2, 4);
+                    const promotion = apiResponse.move.length > 4 ? apiResponse.move.substring(4) : undefined;
+                    
+                    // Try to make the move suggested by Stockfish
+                    const moveObj = {
+                        from: fromSquare,
+                        to: toSquare
+                    };
+                    
+                    if (promotion) {
+                        moveObj.promotion = promotion;
+                    }
+                    
+                    bestMove = this.game.move(moveObj);
+                } else {
+                    throw new Error('Invalid API response');
                 }
+            } catch (apiError) {
+                // Fallback to basic AI if API fails
+                bestMove = this.getBasicAIMove(moves);
             }
-        });
-    }
-    
-    // Update captured pieces display
-    updateCapturedPiecesDisplay() {
-        const whiteCapturedElement = document.getElementById('captured-white-pieces');
-        const blackCapturedElement = document.getElementById('captured-black-pieces');
-        
-        if (!whiteCapturedElement || !blackCapturedElement) return;
-        
-        // Clear existing displays
-        whiteCapturedElement.innerHTML = '';
-        blackCapturedElement.innerHTML = '';
-        
-        // Display captured white pieces
-        this.capturedPieces.white.forEach(piece => {
-            const pieceElement = document.createElement('span');
-            pieceElement.className = 'captured-piece';
-            pieceElement.textContent = this.pieceSymbols.white[piece.type];
-            pieceElement.title = `Captured ${piece.type}`;
-            whiteCapturedElement.appendChild(pieceElement);
-        });
-        
-        // Display captured black pieces
-        this.capturedPieces.black.forEach(piece => {
-            const pieceElement = document.createElement('span');
-            pieceElement.className = 'captured-piece';
-            pieceElement.textContent = this.pieceSymbols.black[piece.type];
-            pieceElement.title = `Captured ${piece.type}`;
-            blackCapturedElement.appendChild(pieceElement);
-        });
-    }
-    
-    highlightSquare(square) {
-        this.clearHighlights();
-        square.classList.add('selected');
-        
-        // Highlight valid moves for the selected piece
-        if (this.selectedSquare) {
-            this.highlightValidMoves(this.selectedSquare.row, this.selectedSquare.col);
-        }
-    }
-    
-    highlightValidMoves(fromRow, fromCol) {
-        const piece = this.board[fromRow][fromCol];
-        if (!piece) return;
-        
-        // Get all possible moves for the piece type
-        const validMoves = this.getValidMovesForPiece(piece, fromRow, fromCol);
-        
-        // Highlight each valid move square
-        validMoves.forEach(({row, col}) => {
-            const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-            if (square) {
-                square.classList.add('valid-move');
-            }
-        });
-    }
-    
-    getValidMovesForPiece(piece, fromRow, fromCol) {
-        const moves = [];
-        
-        // Test all possible squares on the board
-        for (let toRow = 0; toRow < 8; toRow++) {
-            for (let toCol = 0; toCol < 8; toCol++) {
-                if (this.isValidMove({row: fromRow, col: fromCol}, {row: toRow, col: toCol}, piece)) {
-                    moves.push({row: toRow, col: toCol});
+            
+            if (bestMove) {
+                this.chessboard.position(this.game.fen());
+                this.updateAfterMove(bestMove);
                 }
+            
+        } catch (error) {
+            console.error('AI move error:', error);
+        }
+        
+        this.aiThinking = false;
+        this.updateUI();
+    }
+    
+    async getStockfishMove(fen, difficulty) {
+        try {
+            // Map difficulty (1-20) to appropriate depth (1-18)
+            const depth = Math.min(Math.max(difficulty, 1), 18);
+            const maxThinkingTime = Math.min(50 + (difficulty * 2), 100);
+            
+            const response = await fetch("https://chess-api.com/v1", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    fen: fen,
+                    depth: depth,
+                    maxThinkingTime: maxThinkingTime,
+                    variants: 1
+                }),
+            });
+            
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data;
+            
+        } catch (error) {
+            console.error('Stockfish API error:', error);
+            throw error;
+        }
+    }
+    
+    getBasicAIMove(moves) {
+        // Fallback basic AI (same as before)
+        const captureMove = moves.find(move => move.captured);
+        const centerMoves = moves.filter(move => 
+            ['e4', 'e5', 'd4', 'd5'].includes(move.to) || 
+            ['e4', 'e5', 'd4', 'd5'].includes(move.from)
+        );
+        
+        let selectedMove;
+        if (captureMove) {
+            selectedMove = captureMove;
+        } else if (centerMoves.length > 0) {
+            selectedMove = centerMoves[Math.floor(Math.random() * centerMoves.length)];
+        } else {
+            selectedMove = moves[Math.floor(Math.random() * moves.length)];
+        }
+        
+        return this.game.move(selectedMove);
+    }
+    
+    getStrengthDescription(evaluation) {
+        if (evaluation === null || evaluation === undefined) return 'Unknown';
+        
+        const absEval = Math.abs(evaluation);
+        if (absEval < 0.5) return 'Equal position';
+        if (absEval < 1.5) return 'Slight advantage';
+        if (absEval < 3.0) return 'Clear advantage';
+        if (absEval < 6.0) return 'Winning position';
+        return 'Decisive advantage';
+    }
+    
+    getAILevelDescription(difficulty) {
+        const depthLevel = Math.min(Math.max(difficulty, 1), 18);
+        
+        if (depthLevel <= 6) return 'Beginner';
+        else if (depthLevel <= 10) return 'Club Player';
+        else if (depthLevel <= 12) return 'International Master';
+        else if (depthLevel <= 15) return 'Grandmaster';
+        else return 'Super Grandmaster';
+    }
+    
+    handleGameOver() {
+        let status = '';
+        
+        if (this.game.in_checkmate()) {
+            const winner = this.game.turn() === 'w' ? 'Black' : 'White';
+            status = 'Checkmate! ' + winner + ' wins!';
+        } else if (this.game.in_draw()) {
+            if (this.game.in_stalemate()) {
+                status = 'Draw by stalemate';
+            } else if (this.game.in_threefold_repetition()) {
+                status = 'Draw by repetition';
+            } else if (this.game.insufficient_material()) {
+                status = 'Draw by insufficient material';
+            } else {
+                status = 'Draw by 50-move rule';
             }
         }
         
-        return moves;
+        this.gameStatus = 'finished';
+        this.updateUI();
+        
+        if (status) {
+            setTimeout(() => alert(status), 100);
+        }
     }
     
-    // Old piece-specific movement functions removed - now using unified validation system
-    
-    isValidSquare(row, col) {
-        return row >= 0 && row < 8 && col >= 0 && col < 8;
-    }
-    
-    clearHighlights() {
-        document.querySelectorAll('.square').forEach(sq => {
-            sq.classList.remove('selected', 'valid-move');
-        });
-    }
-    
-    clearSelection() {
-        this.selectedSquare = null;
-        this.clearHighlights();
+    rotateBoard() {
+        this.boardRotated = !this.boardRotated;
+        if (this.chessboard) {
+            this.chessboard.flip();
+        }
     }
     
     updateUI() {
-        const currentPlayerElement = document.getElementById('current-player');
-        currentPlayerElement.textContent = 
-            this.currentPlayer.charAt(0).toUpperCase() + this.currentPlayer.slice(1);
-        
-        // Add visual indicator for current player
-        currentPlayerElement.style.color = this.currentPlayer === 'white' ? '#fff' : '#333';
-        currentPlayerElement.style.backgroundColor = this.currentPlayer === 'white' ? '#333' : '#fff';
-        currentPlayerElement.style.padding = '4px 8px';
-        currentPlayerElement.style.borderRadius = '4px';
-        currentPlayerElement.style.fontWeight = 'bold';
-        
-        const statusText = this.gameStatus === 'waiting' ? 'Ready to Play' : 
-            this.gameStatus.charAt(0).toUpperCase() + this.gameStatus.slice(1);
-        document.getElementById('game-status').textContent = statusText;
-        
-        if (this.gameMode === 'ai') {
-            document.getElementById('game-mode').textContent = `Human vs AI (AI plays ${this.aiColor})`;
-            document.getElementById('ai-info').style.display = 'block';
-            document.getElementById('ai-difficulty-display').textContent = this.aiDifficulty;
-            
-            // Show whose turn indicator for AI games
-            const turnIndicator = this.currentPlayer === this.aiColor ? '🤖 AI\'s Turn' : '👤 Your Turn';
-            const statusElement = document.getElementById('game-status');
-            if (this.gameStatus === 'playing') {
-                statusElement.textContent = turnIndicator;
-                statusElement.style.color = this.currentPlayer === this.aiColor ? '#ff6b35' : '#4ecdc4';
-            }
-        } else {
-            document.getElementById('game-mode').textContent = 'Human vs Human';
-            document.getElementById('ai-info').style.display = 'none';
+        const currentPlayerEl = document.querySelector('.current-player span');
+        if (currentPlayerEl) {
+            const currentPlayer = this.game.turn() === 'w' ? 'White' : 'Black';
+            currentPlayerEl.textContent = currentPlayer;
         }
         
-        // Update board orientation hint
-        this.updateBoardHints();
+        const gameStatusEl = document.querySelector('.game-status span');
+        if (gameStatusEl) {
+            let status = 'Ready to Play';
+            
+            if (this.gameStatus === 'playing') {
+                if (this.aiThinking) {
+                    const depthLevel = Math.min(Math.max(this.aiDifficulty, 1), 18);
+                    const aiLevel = this.getAILevelDescription(this.aiDifficulty);
+                    status = `AI Thinking... (${aiLevel} Level)`;
+                } else if (this.game.in_check()) {
+                    status = 'Check!';
+                } else {
+                    status = 'Playing';
+                    
+                    // Show AI level when playing against AI
+                    if (this.gameMode === 'ai') {
+                        const depthLevel = Math.min(Math.max(this.aiDifficulty, 1), 18);
+                        const aiLevel = this.getAILevelDescription(this.aiDifficulty);
+                        status = `Playing vs ${aiLevel} AI (Depth ${depthLevel})`;
+                    }
+                }
+            } else if (this.gameStatus === 'finished') {
+                status = 'Game Over';
+            }
+            
+            gameStatusEl.textContent = status;
+        }
         
-        // Update captured pieces display
+        const gameModeEl = document.querySelector('.game-mode span');
+        if (gameModeEl) {
+            const mode = this.gameMode === 'ai' ? 'Human vs AI (' + this.aiColor + ')' : 'Human vs Human';
+            gameModeEl.textContent = mode;
+        }
+        
+        const aiInfoEl = document.querySelector('.ai-info span');
+        if (aiInfoEl) {
+            const depthLevel = Math.min(Math.max(this.aiDifficulty, 1), 18);
+            const strengthDesc = this.getAILevelDescription(this.aiDifficulty);
+            
+            aiInfoEl.textContent = `AI: Stockfish 17 Depth ${depthLevel} (${strengthDesc})`;
+        }
+        
         this.updateCapturedPiecesDisplay();
     }
     
-    updateBoardHints() {
-        // Add subtle hints about piece movement
-        if (this.gameStatus === 'playing') {
-            const pieces = document.querySelectorAll('.piece');
-            pieces.forEach(piece => {
-                const square = piece.parentElement;
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
-                const boardPiece = this.board[row][col];
-                
-                if (boardPiece && boardPiece.color === this.currentPlayer) {
-                    piece.style.cursor = 'pointer';
-                    piece.title = `Click to move this ${boardPiece.type}`;
-                } else {
-                    piece.style.cursor = 'default';
-                    piece.title = '';
-                }
-            });
-        }
-    }
-    
-    showAIThinking(show) {
-        const aiStatus = document.getElementById('ai-status');
-        const aiThinking = document.getElementById('ai-thinking');
+    updateCapturedPiecesDisplay() {
+        const capturedWhiteEl = document.getElementById('captured-white-pieces');
+        const capturedBlackEl = document.getElementById('captured-black-pieces');
         
-        if (show) {
-            aiStatus.style.display = 'block';
-            aiThinking.textContent = `Stockfish is analyzing... (Depth ${Math.min(this.aiDifficulty, 18)})`;
-        } else {
-            aiStatus.style.display = 'none';
+        if (capturedWhiteEl) {
+            const whiteSymbols = this.capturedPieces.white
+                .map(piece => this.getPieceSymbol(piece.type, 'white'));
+            capturedWhiteEl.innerHTML = whiteSymbols.join(' ');
+        }
+        
+        if (capturedBlackEl) {
+            const blackSymbols = this.capturedPieces.black
+                .map(piece => this.getPieceSymbol(piece.type, 'black'));
+            capturedBlackEl.innerHTML = blackSymbols.join(' ');
         }
     }
     
-    showMoveProcessing(show) {
-        if (show) {
-            // Add a subtle loading indicator
-            document.body.style.cursor = 'wait';
-            const selected = document.querySelector('.square.selected');
-            if (selected) {
-                selected.style.opacity = '0.7';
+    getPieceSymbol(type, color) {
+        const symbols = {
+            white: {
+                p: '♙', r: '♖', n: '♘', b: '♗', q: '♕', k: '♔'
+            },
+            black: {
+                p: '♟', r: '♜', n: '♞', b: '♝', q: '♛', k: '♚'
             }
-        } else {
-            // Remove loading indicator
-            document.body.style.cursor = 'default';
-            const selected = document.querySelector('.square.selected');
-            if (selected) {
-                selected.style.opacity = '1';
+        };
+        return symbols[color][type] || '';
+    }
+    
+    setupKeyboardNavigation() {
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'r' || e.key === 'R') {
+                this.rotateBoard();
             }
+        });
+    }
+    
+    // Sound System
+    initializeSoundSystem() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (error) {
+            console.warn('Web Audio API not supported, sounds disabled');
+            this.soundEnabled = false;
+        }
+    }
+    
+    playSound(type) {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Different sounds for different events
+            switch (type) {
+                case 'move':
+                    oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.1);
+                    break;
+                    
+                case 'capture':
+                    oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.2);
+                    break;
+                    
+                case 'check':
+                    // High-pitched warning sound
+                    oscillator.frequency.setValueAtTime(1500, this.audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(1500, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.3);
+                    break;
+                    
+                case 'checkmate':
+                    // Victory/defeat fanfare
+                    oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime); // C5
+                    oscillator.frequency.setValueAtTime(659, this.audioContext.currentTime + 0.2); // E5
+                    oscillator.frequency.setValueAtTime(784, this.audioContext.currentTime + 0.4); // G5
+                    oscillator.frequency.setValueAtTime(1047, this.audioContext.currentTime + 0.6); // C6
+                    gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 1.0);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 1.0);
+                    break;
+                    
+                case 'gameStart':
+                    // Game start sound
+                    oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime); // A4
+                    oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime + 0.15); // C5
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.3);
+                    break;
+                    
+                default:
+                    // Default click sound
+                    oscillator.frequency.setValueAtTime(600, this.audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.05);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.05);
+            }
+        } catch (error) {
+            console.warn('Error playing sound:', error);
+        }
+    }
+    
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+        this.updateSoundButtonState();
+        
+        // Play a test sound when enabling
+        if (this.soundEnabled) {
+            this.playSound('move');
+        }
+    }
+    
+    updateSoundButtonState() {
+        const soundBtn = document.getElementById('sound-toggle-btn');
+        if (soundBtn) {
+            const icon = soundBtn.querySelector('.toggle-icon');
+            if (icon) {
+                icon.textContent = this.soundEnabled ? '🔊' : '🔇';
+            }
+            soundBtn.classList.toggle('active', this.soundEnabled);
+        }
+    }
+    
+    
+    // Error message handling
+    showErrorMessage(message) {
+        const errorElement = document.querySelector('.error-message');
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.style.display = 'block';
+            setTimeout(() => this.clearErrorMessage(), 3000);
+        }
+    }
+    
+    clearErrorMessage() {
+        const errorElement = document.querySelector('.error-message');
+        if (errorElement) {
+            errorElement.style.display = 'none';
+            errorElement.textContent = '';
+        }
+    }
+    
+    // Game ID display update
+    updateGameIdDisplay() {
+        const gameIdElement = document.querySelector('.game-id span');
+        if (gameIdElement && this.gameId) {
+            gameIdElement.textContent = this.gameId;
         }
     }
     
     attachEventListeners() {
-        // New Game (PvP) button
-        document.getElementById('new-game-btn').addEventListener('click', () => {
-            this.createGame('pvp');
-        });
+        // Wait for DOM to be fully loaded
+        if (document.readyState !== 'complete') {
+            console.log('DOM not ready, waiting...');
+            setTimeout(() => this.attachEventListeners(), 100);
+            return;
+        }
         
-        // AI Game button
-        document.getElementById('ai-game-btn').addEventListener('click', () => {
-            document.getElementById('ai-setup-modal').style.display = 'block';
-        });
+        try {
+            const aiGameBtn = document.getElementById('ai-game-btn');
+            if (!aiGameBtn) {
+                console.error('AI game button not found in DOM');
+                return;
+            }
+            
+            aiGameBtn.addEventListener('click', () => {
+                console.log('AI game button clicked');
+                document.getElementById('ai-setup-modal').style.display = 'flex';
+            });
+            console.log('AI game button listener attached successfully');
+        } catch (error) {
+            console.error('Error attaching AI game button listener:', error);
+        }
         
-        // AI setup modal
+        const newGameBtn = document.getElementById('new-game-btn');
+        if (newGameBtn) {
+            newGameBtn.addEventListener('click', () => {
+                console.log('New human game clicked');
+                this.createGame('human');
+            });
+            console.log('New game button listener attached successfully');
+        } else {
+            console.error('New game button not found');
+        }
+        
+        const rotateBtn = document.getElementById('rotate-board-btn');
+        if (rotateBtn) {
+            rotateBtn.addEventListener('click', () => {
+                this.rotateBoard();
+            });
+            console.log('Rotate button listener attached successfully');
+        } else {
+            console.error('Rotate button not found');
+        }
+        
+        const toggleBtn = document.getElementById('toggle-move-highlight-btn');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                this.toggleMoveHighlighting();
+            });
+            console.log('Toggle move highlight button listener attached successfully');
+        } else {
+            console.error('Toggle move highlight button not found');
+        }
+
+        const soundToggleBtn = document.getElementById('sound-toggle-btn');
+        if (soundToggleBtn) {
+            soundToggleBtn.addEventListener('click', () => {
+                this.toggleSound();
+            });
+            console.log('Sound toggle button listener attached successfully');
+        } else {
+            console.error('Sound toggle button not found');
+        }
+        
         const modal = document.getElementById('ai-setup-modal');
-        const closeBtn = modal.querySelector('.close');
-        const cancelBtn = document.getElementById('cancel-ai-setup');
-        const startBtn = document.getElementById('start-ai-game');
+        const startAIGameBtn = document.getElementById('start-ai-game');
+        const cancelAIBtn = document.getElementById('cancel-ai-setup');
+        
+        if (!modal) {
+            console.error('AI setup modal not found');
+            return;
+        }
+        
+        if (!startAIGameBtn) {
+            console.error('Start AI game button not found');
+            return;
+        } else {
+            console.log('Start AI game button found:', startAIGameBtn);
+        }
+        
+        if (!cancelAIBtn) {
+            console.error('Cancel AI button not found');
+            return;
+        }
+        
+        startAIGameBtn.addEventListener('click', (event) => {
+            console.log('Start AI game clicked - event triggered');
+            event.preventDefault();
+            const colorSelect = document.getElementById('ai-color');
         const difficultySlider = document.getElementById('ai-difficulty');
-        const difficultyValue = document.getElementById('difficulty-value');
-        
-        closeBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-        
-        cancelBtn.addEventListener('click', () => {
-            modal.style.display = 'none';
-        });
-        
-        startBtn.addEventListener('click', () => {
-            const aiColor = document.getElementById('ai-color').value;
-            const difficulty = parseInt(difficultySlider.value);
+            
+            if (!colorSelect || !difficultySlider) {
+                console.error('Missing form elements:', { colorSelect, difficultySlider });
+                return;
+            }
             
             const aiSettings = {
-                color: aiColor,
-                difficulty: difficulty,
-                maxDepth: Math.min(12 + Math.floor(difficulty / 3), 18),
-                timeLimit: 1000 + (difficulty * 100)
+                color: colorSelect.value,
+                difficulty: parseInt(difficultySlider.value)
             };
             
-            this.createGame('ai', aiSettings);
+            console.log('Creating AI game with settings:', aiSettings);
+            try {
+                const gameCreated = this.createGame('ai', aiSettings);
+                console.log('Game creation result:', gameCreated);
+            modal.style.display = 'none';
+            } catch (error) {
+                console.error('Error creating AI game:', error);
+                this.showErrorMessage('Failed to start AI game. Please try again.');
+            }
+        });
+        
+        cancelAIBtn.addEventListener('click', () => {
+            console.log('Cancel AI game clicked');
             modal.style.display = 'none';
         });
         
-        difficultySlider.addEventListener('input', () => {
-            difficultyValue.textContent = difficultySlider.value;
-        });
+        // Add close button (X) functionality
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                console.log('Close X button clicked');
+                modal.style.display = 'none';
+            });
+        }
         
-        // Rotate board button
-        document.getElementById('rotate-board-btn').addEventListener('click', () => {
-            this.rotateBoard();
-        });
-        
-        // Move highlighting toggle button
-        document.getElementById('toggle-move-highlight-btn').addEventListener('click', () => {
-            this.toggleMoveHighlighting();
-        });
-        
-        // Close modal when clicking outside
         window.addEventListener('click', (event) => {
             if (event.target === modal) {
+                console.log('Modal backdrop clicked');
                 modal.style.display = 'none';
             }
         });
         
-        // Promotion modal event listeners
-        this.setupPromotionModal();
-    }
-    
-    // Keyboard navigation inspired by gchessboard accessibility
-    setupKeyboardNavigation() {
-        this.focusedSquare = { row: 4, col: 4 }; // Start in center
-        this.keyboardMode = false;
+        const difficultySlider = document.getElementById('ai-difficulty');
+        const difficultyValue = document.getElementById('difficulty-value');
         
-        // Make board focusable
-        const boardElement = document.getElementById('chess-board');
-        boardElement.setAttribute('tabindex', '0');
-        boardElement.setAttribute('role', 'grid');
-        boardElement.setAttribute('aria-label', 'Chess board');
-        
-        // Add keyboard event listeners
-        boardElement.addEventListener('keydown', (e) => this.handleKeyboardInput(e));
-        boardElement.addEventListener('focus', () => {
-            this.keyboardMode = true;
-            this.updateKeyboardFocus();
+        difficultySlider.addEventListener('input', () => {
+            difficultyValue.textContent = difficultySlider.value;
         });
-        boardElement.addEventListener('blur', () => {
-            this.keyboardMode = false;
-            this.clearKeyboardFocus();
-        });
-    }
-    
-    handleKeyboardInput(event) {
-        if (!this.keyboardMode || this.gameStatus !== 'playing') return;
-        
-        const { row, col } = this.focusedSquare;
-        let newRow = row;
-        let newCol = col;
-        
-        switch (event.key) {
-            case 'ArrowUp':
-                newRow = Math.max(0, row - 1);
-                event.preventDefault();
-                break;
-            case 'ArrowDown':
-                newRow = Math.min(7, row + 1);
-                event.preventDefault();
-                break;
-            case 'ArrowLeft':
-                newCol = Math.max(0, col - 1);
-                event.preventDefault();
-                break;
-            case 'ArrowRight':
-                newCol = Math.min(7, col + 1);
-                event.preventDefault();
-                break;
-            case ' ':
-            case 'Enter':
-                this.handleKeyboardSquareSelect();
-                event.preventDefault();
-                break;
-            case 'Escape':
-                this.clearSelection();
-                event.preventDefault();
-                break;
-        }
-        
-        if (newRow !== row || newCol !== col) {
-            this.focusedSquare = { row: newRow, col: newCol };
-            this.updateKeyboardFocus();
-        }
-    }
-    
-    handleKeyboardSquareSelect() {
-        const { row, col } = this.focusedSquare;
-        const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-        if (square) {
-            square.click(); // Reuse existing click handler
-        }
-    }
-    
-    updateKeyboardFocus() {
-        // Clear previous focus
-        this.clearKeyboardFocus();
-        
-        const { row, col } = this.focusedSquare;
-        const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
-        if (square) {
-            square.classList.add('keyboard-focused');
-            
-            // Add aria labels for accessibility
-            const piece = this.board[row][col];
-            const squareNotation = this.getSquareNotation(row, col);
-            let label = `Square ${squareNotation}`;
-            
-            if (piece) {
-                label += `, ${piece.color} ${piece.type}`;
-            } else {
-                label += ', empty';
-            }
-            
-            square.setAttribute('aria-label', label);
-        }
-    }
-    
-    clearKeyboardFocus() {
-        document.querySelectorAll('.square.keyboard-focused').forEach(sq => {
-            sq.classList.remove('keyboard-focused');
-        });
-    }
-    
-    setupPromotionModal() {
-        const promotionBtns = document.querySelectorAll('.promotion-btn');
-        promotionBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const piece = e.currentTarget.dataset.piece;
-                this.completePromotion(piece);
-            });
-        });
-    }
-    
-    showPromotionModal(row, col) {
-        this.promotionSquare = { row, col };
-        const modal = document.getElementById('promotion-modal');
-        const currentColor = this.board[row][col].color;
-        
-        // Update piece symbols for correct color
-        const promotionPieces = document.querySelectorAll('.promotion-piece');
-        const symbols = {
-            queen: currentColor === 'white' ? '♕' : '♛',
-            rook: currentColor === 'white' ? '♖' : '♜',
-            bishop: currentColor === 'white' ? '♗' : '♝',
-            knight: currentColor === 'white' ? '♘' : '♞'
-        };
-        
-        promotionPieces.forEach(piece => {
-            const btn = piece.parentElement;
-            const pieceType = btn.dataset.piece;
-            piece.textContent = symbols[pieceType];
-        });
-        
-        modal.style.display = 'block';
-    }
-    
-    completePromotion(pieceType) {
-        if (!this.promotionSquare) return;
-        
-        const { row, col } = this.promotionSquare;
-        
-        // Complete the promotion
-        this.board[row][col].type = pieceType;
-        
-        // Hide modal
-        document.getElementById('promotion-modal').style.display = 'none';
-        this.promotionSquare = null;
-        
-        // Continue with the rest of the move logic
-        this.finalizeMoveAfterPromotion();
-    }
-    
-    finalizeMoveAfterPromotion() {
-        // Add the promotion move to history if we have lastMove
-        if (this.lastMove) {
-            this.addMoveToHistory(this.lastMove, false, false, this.board[this.lastMove.toCoords.row][this.lastMove.toCoords.col].type);
-        }
-        
-        // Switch players
-        this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
-        
-        // Clear selection
-        this.clearSelection();
-        this.renderBoard();
-        this.updateUI();
-        
-        // Clear any error messages
-        this.clearErrorMessage();
-        
-        console.log(`Pawn promoted and move completed`);
-        
-        // Check if AI should move next
-        if (this.gameMode === 'ai' && 
-            this.currentPlayer === this.aiColor && 
-            this.gameStatus === 'playing') {
-            setTimeout(() => this.makeStockfishAIMove(), 1000);
-        }
     }
 }
 
-// Initialize the game when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     window.chessGame = new ChessGameClient();
 });
+
+// Fallback if DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+    window.chessGame = new ChessGameClient();
+}
