@@ -67,13 +67,38 @@ body {
     font-size: 0.9em;
 }
 
+/* Board container with coordinates */
+.board-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 auto;
+    width: fit-content;
+}
+
+.board-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.board-and-files {
+    display: flex;
+    flex-direction: column;
+}
+
+.board-container-inner {
+    position: relative;
+    width: 480px;
+    height: 480px;
+}
+
 .chess-board {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
     width: 480px;
     height: 480px;
-    margin: 0 auto;
     border: 4px solid #2c2c2c;
     border-radius: 12px;
     overflow: hidden;
@@ -82,6 +107,134 @@ body {
         inset 0 0 0 2px rgba(255, 255, 255, 0.1),
         0 0 0 1px rgba(0, 0, 0, 0.2);
     background: linear-gradient(145deg, #f5f5f5 0%, #e8e8e8 100%);
+    position: relative;
+    z-index: 1;
+}
+
+/* SVG overlay for arrows and annotations */
+.board-svg-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Enhanced square highlighting */
+.square.last-move {
+    background-color: rgba(255, 235, 59, 0.6) !important;
+    box-shadow: inset 0 0 0 3px rgba(255, 193, 7, 0.8);
+}
+
+.square.suggested-move {
+    background-color: rgba(76, 175, 80, 0.4) !important;
+    position: relative;
+}
+
+.square.suggested-move::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: rgba(76, 175, 80, 0.8);
+    transform: translate(-50%, -50%);
+    animation: suggestedPulse 2s ease-in-out infinite;
+}
+
+@keyframes suggestedPulse {
+    0%, 100% { 
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+    }
+    50% { 
+        transform: translate(-50%, -50%) scale(1.2);
+        opacity: 1;
+    }
+}
+
+/* Enhanced piece hover effects */
+.square .piece {
+    transition: all 0.2s ease;
+}
+
+.square:hover .piece {
+    transform: scale(1.1);
+    filter: brightness(1.1);
+}
+
+/* Keyboard focus styling */
+.chess-board:focus {
+    outline: 3px solid #007bff;
+    outline-offset: 2px;
+}
+
+.square.keyboard-focused {
+    outline: 3px solid #007bff;
+    outline-offset: -3px;
+    z-index: 10;
+    position: relative;
+}
+
+/* Coordinate labels styling */
+.file-labels {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    width: 480px;
+    margin: 0;
+}
+
+.rank-labels {
+    display: flex;
+    flex-direction: column;
+    height: 480px;
+    margin: 0;
+}
+
+.file-label, .rank-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    color: #555;
+    user-select: none;
+}
+
+.file-label {
+    height: 25px;
+}
+
+.rank-label {
+    width: 25px;
+    flex: 1;
+}
+
+/* Position coordinate labels */
+.bottom-files {
+    margin-top: 4px;
+}
+
+.left-ranks, .right-ranks {
+    align-self: stretch;
+}
+
+/* Different styling for bottom files vs left/right ranks */
+.bottom-files .file-label {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.left-ranks .rank-label, .right-ranks .rank-label {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    margin: 2px 0;
 }
 
 .square {
@@ -492,9 +645,37 @@ body {
 }
 
 @media (max-width: 600px) {
+    .board-container-inner {
+        width: 320px;
+        height: 320px;
+    }
+    
     .chess-board {
         width: 320px;
         height: 320px;
+    }
+    
+    .board-svg-overlay {
+        width: 320px;
+        height: 320px;
+    }
+    
+    .file-labels {
+        width: 320px;
+    }
+    
+    .rank-labels {
+        height: 320px;
+    }
+    
+    .file-label {
+        height: 20px;
+        font-size: 12px;
+    }
+    
+    .rank-label {
+        width: 20px;
+        font-size: 12px;
     }
     
     .square {

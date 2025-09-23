@@ -16,6 +16,17 @@ class ChessGameClient {
         this.moveHistory = []; // Store all moves for notation
         this.fullMoveNumber = 1; // Full move counter
         
+        // Visual enhancements inspired by gchessboard
+        this.arrows = []; // Store arrows for move visualization
+        this.highlightedSquares = new Set(); // Custom square highlights
+        this.lastMoveHighlight = null; // Highlight last move
+        
+        // Captured pieces tracking
+        this.capturedPieces = {
+            white: [],
+            black: []
+        };
+        
         // Track castling rights and en passant
         this.castlingRights = {
             white: { kingside: true, queenside: true },
@@ -39,7 +50,9 @@ class ChessGameClient {
         this.initializeBoard();
         this.renderBoard();
         this.updateUI();
+        this.updateCoordinateLabels();
         this.attachEventListeners();
+        this.setupKeyboardNavigation();
         // No backend - pure frontend chess game
     }
     
@@ -92,6 +105,10 @@ class ChessGameClient {
         this.lastMove = null;
         this.moveHistory = [];
         this.fullMoveNumber = 1;
+        this.capturedPieces = {
+            white: [],
+            black: []
+        };
         
         this.renderBoard();
         this.updateUI();
@@ -151,9 +168,18 @@ class ChessGameClient {
         this.board[toCoords.row][toCoords.col] = piece;
         this.board[fromCoords.row][fromCoords.col] = null;
         
+        // Handle captured pieces
+        if (moveInfo.captured) {
+            this.capturedPieces[moveInfo.captured.color].push(moveInfo.captured);
+        }
+        
         // Handle en passant capture
         if (isEnPassant) {
             const capturedPawnRow = fromCoords.row;
+            const capturedPawn = this.board[capturedPawnRow][toCoords.col];
+            if (capturedPawn) {
+                this.capturedPieces[capturedPawn.color].push(capturedPawn);
+            }
             this.board[capturedPawnRow][toCoords.col] = null;
         }
         
@@ -194,6 +220,9 @@ class ChessGameClient {
         if (!isPromotion || promotion) {
             this.addMoveToHistory(moveInfo, isEnPassant, isCastling, promotion);
         }
+        
+        // Update last move highlight
+        this.updateLastMoveHighlight(fromCoords, toCoords);
         
         // Switch players
         this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
@@ -771,7 +800,33 @@ class ChessGameClient {
         this.boardRotated = !this.boardRotated;
         this.clearSelection();
         this.renderBoard();
+        this.updateCoordinateLabels();
         console.log('Board rotated:', this.boardRotated ? 'Black on bottom' : 'White on bottom');
+    }
+    
+    // Update coordinate labels based on board rotation
+    updateCoordinateLabels() {
+        const files = this.boardRotated ? ['h', 'g', 'f', 'e', 'd', 'c', 'b', 'a'] : ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = this.boardRotated ? ['1', '2', '3', '4', '5', '6', '7', '8'] : ['8', '7', '6', '5', '4', '3', '2', '1'];
+        
+        // Update file labels (bottom only)
+        const bottomFiles = document.querySelectorAll('#bottom-files .file-label');
+        
+        bottomFiles.forEach((label, index) => {
+            label.textContent = files[index];
+        });
+        
+        // Update rank labels (left and right)
+        const leftRanks = document.querySelectorAll('#left-ranks .rank-label');
+        const rightRanks = document.querySelectorAll('#right-ranks .rank-label');
+        
+        leftRanks.forEach((label, index) => {
+            label.textContent = ranks[index];
+        });
+        
+        rightRanks.forEach((label, index) => {
+            label.textContent = ranks[index];
+        });
     }
     
     // Chess notation functions
@@ -894,6 +949,130 @@ class ChessGameClient {
         historyElement.scrollTop = historyElement.scrollHeight;
     }
     
+    // Enhanced visual features inspired by gchessboard
+    drawArrow(fromSquare, toSquare, brush = 'primary') {
+        const svg = document.getElementById('board-svg');
+        if (!svg) return;
+        
+        const fromCoords = this.parseSquareNotation(fromSquare);
+        const toCoords = this.parseSquareNotation(toSquare);
+        if (!fromCoords || !toCoords) return;
+        
+        // Convert to display coordinates
+        const fromDisplay = this.getDisplayCoords(fromCoords.row, fromCoords.col);
+        const toDisplay = this.getDisplayCoords(toCoords.row, toCoords.col);
+        
+        // Calculate pixel positions (60px per square)
+        const fromX = (fromDisplay.displayCol * 60) + 30;
+        const fromY = (fromDisplay.displayRow * 60) + 30;
+        const toX = (toDisplay.displayCol * 60) + 30;
+        const toY = (toDisplay.displayRow * 60) + 30;
+        
+        // Create arrow line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', fromX);
+        line.setAttribute('y1', fromY);
+        line.setAttribute('x2', toX);
+        line.setAttribute('y2', toY);
+        line.setAttribute('stroke', brush === 'secondary' ? '#FF9800' : '#4CAF50');
+        line.setAttribute('stroke-width', '6');
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('opacity', '0.8');
+        line.setAttribute('marker-end', `url(#arrowhead${brush === 'secondary' ? '-secondary' : ''})`);
+        line.classList.add('board-arrow', `arrow-${brush}`);
+        
+        svg.appendChild(line);
+        
+        // Store arrow data
+        this.arrows.push({
+            from: fromSquare,
+            to: toSquare,
+            brush: brush,
+            element: line
+        });
+    }
+    
+    clearArrows() {
+        const svg = document.getElementById('board-svg');
+        if (!svg) return;
+        
+        // Remove all arrow elements
+        const arrows = svg.querySelectorAll('.board-arrow');
+        arrows.forEach(arrow => arrow.remove());
+        
+        // Clear arrows array
+        this.arrows = [];
+    }
+    
+    updateLastMoveHighlight(fromCoords, toCoords) {
+        // Clear previous last move highlights
+        document.querySelectorAll('.square.last-move').forEach(sq => {
+            sq.classList.remove('last-move');
+        });
+        
+        // Add last move highlight to from and to squares
+        const fromSquare = document.querySelector(`[data-row="${fromCoords.row}"][data-col="${fromCoords.col}"]`);
+        const toSquare = document.querySelector(`[data-row="${toCoords.row}"][data-col="${toCoords.col}"]`);
+        
+        if (fromSquare) fromSquare.classList.add('last-move');
+        if (toSquare) toSquare.classList.add('last-move');
+        
+        // Optionally draw an arrow for the last move
+        this.clearArrows();
+        const fromNotation = this.getSquareNotation(fromCoords.row, fromCoords.col);
+        const toNotation = this.getSquareNotation(toCoords.row, toCoords.col);
+        this.drawArrow(fromNotation, toNotation, 'primary');
+    }
+    
+    // Add suggested moves visualization
+    showSuggestedMoves(moves) {
+        // Clear previous suggestions
+        document.querySelectorAll('.square.suggested-move').forEach(sq => {
+            sq.classList.remove('suggested-move');
+        });
+        
+        // Add suggestions
+        moves.forEach(move => {
+            const coords = this.parseSquareNotation(move.to);
+            if (coords) {
+                const square = document.querySelector(`[data-row="${coords.row}"][data-col="${coords.col}"]`);
+                if (square) {
+                    square.classList.add('suggested-move');
+                }
+            }
+        });
+    }
+    
+    // Update captured pieces display
+    updateCapturedPiecesDisplay() {
+        const whiteCapturedElement = document.getElementById('captured-white-pieces');
+        const blackCapturedElement = document.getElementById('captured-black-pieces');
+        
+        if (!whiteCapturedElement || !blackCapturedElement) return;
+        
+        // Clear existing displays
+        whiteCapturedElement.innerHTML = '';
+        blackCapturedElement.innerHTML = '';
+        
+        // Display captured white pieces
+        this.capturedPieces.white.forEach(piece => {
+            const pieceElement = document.createElement('span');
+            pieceElement.className = 'captured-piece';
+            pieceElement.textContent = this.pieceSymbols.white[piece.type];
+            pieceElement.title = `Captured ${piece.type}`;
+            whiteCapturedElement.appendChild(pieceElement);
+        });
+        
+        // Display captured black pieces
+        this.capturedPieces.black.forEach(piece => {
+            const pieceElement = document.createElement('span');
+            pieceElement.className = 'captured-piece';
+            pieceElement.textContent = this.pieceSymbols.black[piece.type];
+            pieceElement.title = `Captured ${piece.type}`;
+            blackCapturedElement.appendChild(pieceElement);
+        });
+    }
+    
     highlightSquare(square) {
         this.clearHighlights();
         square.classList.add('selected');
@@ -987,6 +1166,9 @@ class ChessGameClient {
         
         // Update board orientation hint
         this.updateBoardHints();
+        
+        // Update captured pieces display
+        this.updateCapturedPiecesDisplay();
     }
     
     updateBoardHints() {
@@ -1086,11 +1268,6 @@ class ChessGameClient {
             difficultyValue.textContent = difficultySlider.value;
         });
         
-        // Undo button (placeholder)
-        document.getElementById('undo-btn').addEventListener('click', () => {
-            console.log('Undo not implemented yet');
-        });
-        
         // Rotate board button
         document.getElementById('rotate-board-btn').addEventListener('click', () => {
             this.rotateBoard();
@@ -1105,6 +1282,108 @@ class ChessGameClient {
         
         // Promotion modal event listeners
         this.setupPromotionModal();
+    }
+    
+    // Keyboard navigation inspired by gchessboard accessibility
+    setupKeyboardNavigation() {
+        this.focusedSquare = { row: 4, col: 4 }; // Start in center
+        this.keyboardMode = false;
+        
+        // Make board focusable
+        const boardElement = document.getElementById('chess-board');
+        boardElement.setAttribute('tabindex', '0');
+        boardElement.setAttribute('role', 'grid');
+        boardElement.setAttribute('aria-label', 'Chess board');
+        
+        // Add keyboard event listeners
+        boardElement.addEventListener('keydown', (e) => this.handleKeyboardInput(e));
+        boardElement.addEventListener('focus', () => {
+            this.keyboardMode = true;
+            this.updateKeyboardFocus();
+        });
+        boardElement.addEventListener('blur', () => {
+            this.keyboardMode = false;
+            this.clearKeyboardFocus();
+        });
+    }
+    
+    handleKeyboardInput(event) {
+        if (!this.keyboardMode || this.gameStatus !== 'playing') return;
+        
+        const { row, col } = this.focusedSquare;
+        let newRow = row;
+        let newCol = col;
+        
+        switch (event.key) {
+            case 'ArrowUp':
+                newRow = Math.max(0, row - 1);
+                event.preventDefault();
+                break;
+            case 'ArrowDown':
+                newRow = Math.min(7, row + 1);
+                event.preventDefault();
+                break;
+            case 'ArrowLeft':
+                newCol = Math.max(0, col - 1);
+                event.preventDefault();
+                break;
+            case 'ArrowRight':
+                newCol = Math.min(7, col + 1);
+                event.preventDefault();
+                break;
+            case ' ':
+            case 'Enter':
+                this.handleKeyboardSquareSelect();
+                event.preventDefault();
+                break;
+            case 'Escape':
+                this.clearSelection();
+                event.preventDefault();
+                break;
+        }
+        
+        if (newRow !== row || newCol !== col) {
+            this.focusedSquare = { row: newRow, col: newCol };
+            this.updateKeyboardFocus();
+        }
+    }
+    
+    handleKeyboardSquareSelect() {
+        const { row, col } = this.focusedSquare;
+        const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (square) {
+            square.click(); // Reuse existing click handler
+        }
+    }
+    
+    updateKeyboardFocus() {
+        // Clear previous focus
+        this.clearKeyboardFocus();
+        
+        const { row, col } = this.focusedSquare;
+        const square = document.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (square) {
+            square.classList.add('keyboard-focused');
+            
+            // Add aria labels for accessibility
+            const piece = this.board[row][col];
+            const squareNotation = this.getSquareNotation(row, col);
+            let label = `Square ${squareNotation}`;
+            
+            if (piece) {
+                label += `, ${piece.color} ${piece.type}`;
+            } else {
+                label += ', empty';
+            }
+            
+            square.setAttribute('aria-label', label);
+        }
+    }
+    
+    clearKeyboardFocus() {
+        document.querySelectorAll('.square.keyboard-focused').forEach(sq => {
+            sq.classList.remove('keyboard-focused');
+        });
     }
     
     setupPromotionModal() {
