@@ -517,6 +517,31 @@ body {
         drop-shadow(0 0 4px rgba(0, 0, 0, 0.3));
 }
 
+/* Global mobile override for piece colors - high specificity */
+@media screen and (max-width: 768px) {
+    .game-container .chess-board .square .piece-white,
+    .chess-board .square .piece-white,
+    .square .piece-white,
+    .piece-white {
+        color: #f5f5dc !important;
+        text-shadow: 
+            2px 2px 4px rgba(0, 0, 0, 0.8) !important,
+            0 0 8px rgba(245, 245, 220, 0.5) !important;
+        filter: 
+            drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.7)) !important;
+    }
+    
+    .game-container .chess-board .square .piece-black,
+    .chess-board .square .piece-black,
+    .square .piece-black,
+    .piece-black {
+        color: #1a1a1a !important;
+        text-shadow: 
+            1px 1px 3px rgba(255, 255, 255, 0.3) !important,
+            0 0 6px rgba(100, 100, 100, 0.4) !important;
+    }
+}
+
 /* Individual piece styling for better visual distinction */
 .piece-king {
     font-size: 1.1em;
@@ -970,11 +995,13 @@ body {
     }
     
     /* Ensure white pieces maintain cream color on mobile */
-    .piece-white {
+    .chess-board .square .piece-white {
         color: #f5f5dc !important;
         text-shadow: 
-            2px 2px 4px rgba(0, 0, 0, 0.8),
+            2px 2px 4px rgba(0, 0, 0, 0.8) !important,
             0 0 8px rgba(245, 245, 220, 0.5) !important;
+        filter: 
+            drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.7)) !important;
     }
     
     .move-notation h3, .captured-white h3, .captured-black h3 {
@@ -1034,6 +1061,16 @@ body {
         width: 30px;
         height: 30px;
         font-size: 1.4em;
+    }
+    
+    /* Force white piece colors on smallest mobile screens */
+    .chess-board .square .piece-white {
+        color: #f5f5dc !important;
+        text-shadow: 
+            2px 2px 4px rgba(0, 0, 0, 0.8) !important,
+            0 0 8px rgba(245, 245, 220, 0.5) !important;
+        filter: 
+            drop-shadow(1px 1px 3px rgba(0, 0, 0, 0.7)) !important;
     }
     
     .btn-primary {
