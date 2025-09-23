@@ -9,7 +9,8 @@
 <body>
     <div class="game-container">
         <div class="game-header">
-            <h1>Chess Game with AI</h1>
+            <h1>AI Chess Master</h1>
+            <p class="subtitle">Challenge Advanced Stockfish Engine</p>
             <div class="game-info">
                 <div class="current-player">
                     Current Player: <span id="current-player">White</span>
@@ -26,12 +27,90 @@
             </div>
         </div>
         
-        <div class="chess-board" id="chess-board"></div>
+        <div class="board-container">
+            <div class="board-wrapper">
+                <!-- Rank labels (1-8) on the left -->
+                <div class="rank-labels left-ranks" id="left-ranks">
+                    <div class="rank-label">8</div>
+                    <div class="rank-label">7</div>
+                    <div class="rank-label">6</div>
+                    <div class="rank-label">5</div>
+                    <div class="rank-label">4</div>
+                    <div class="rank-label">3</div>
+                    <div class="rank-label">2</div>
+                    <div class="rank-label">1</div>
+                </div>
+                
+                <!-- Main board area -->
+                <div class="board-and-files">
+                    <div class="board-container-inner">
+                        <div class="chess-board" id="chess-board"></div>
+                        <svg class="board-svg-overlay" id="board-svg" viewBox="0 0 480 480">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                        refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" opacity="0.8"/>
+                                </marker>
+                                <marker id="arrowhead-secondary" markerWidth="10" markerHeight="7" 
+                                        refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#FF9800" opacity="0.8"/>
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
+                    
+                    <!-- File labels (a-h) at the bottom -->
+                    <div class="file-labels bottom-files" id="bottom-files">
+                        <div class="file-label">a</div>
+                        <div class="file-label">b</div>
+                        <div class="file-label">c</div>
+                        <div class="file-label">d</div>
+                        <div class="file-label">e</div>
+                        <div class="file-label">f</div>
+                        <div class="file-label">g</div>
+                        <div class="file-label">h</div>
+                    </div>
+                </div>
+                
+                <!-- Rank labels (1-8) on the right -->
+                <div class="rank-labels right-ranks" id="right-ranks">
+                    <div class="rank-label">8</div>
+                    <div class="rank-label">7</div>
+                    <div class="rank-label">6</div>
+                    <div class="rank-label">5</div>
+                    <div class="rank-label">4</div>
+                    <div class="rank-label">3</div>
+                    <div class="rank-label">2</div>
+                    <div class="rank-label">1</div>
+                </div>
+            </div>
+        </div>
         
         <div class="game-controls">
-            <button id="new-game-btn" class="btn">New Game (PvP)</button>
-            <button id="ai-game-btn" class="btn">Play vs AI</button>
-            <button id="undo-btn" class="btn">Undo Move</button>
+            <!-- Primary AI Button -->
+            <div class="primary-controls">
+                <button id="ai-game-btn" class="btn btn-primary">
+                    <span class="btn-icon">🤖</span>
+                    Play vs AI
+                </button>
+                <p class="primary-description">Challenge our advanced Stockfish AI engine</p>
+            </div>
+            
+            <!-- Secondary Controls -->
+            <div class="secondary-controls">
+                <button id="new-game-btn" class="btn btn-secondary">
+                    <span class="btn-icon">👥</span>
+                    Human vs Human
+                </button>
+                <button id="rotate-board-btn" class="btn btn-utility">
+                    <span class="btn-icon">🔄</span>
+                    Rotate
+                </button>
+                <button id="toggle-move-highlight-btn" class="btn btn-utility btn-toggle active" title="Toggle latest move highlighting">
+                    <span class="toggle-icon">👁️</span>
+                    Moves
+                </button>
+            </div>
         </div>
         
         <div id="ai-setup-modal" class="modal" style="display: none;">
@@ -53,7 +132,7 @@
                         <span id="difficulty-value">8</span>
                     </div>
                     <div class="form-actions">
-                        <button id="start-ai-game" class="btn">Start AI Game</button>
+                        <button id="start-ai-game" class="btn">Start</button>
                         <button id="cancel-ai-setup" class="btn btn-secondary">Cancel</button>
                     </div>
                 </div>
@@ -85,14 +164,21 @@
             </div>
         </div>
         
-        <div class="captured-pieces">
-            <div class="captured-white">
-                <h3>Captured White Pieces</h3>
-                <div id="captured-white-pieces"></div>
+        <div class="game-info-bottom">
+            <div class="move-notation">
+                <h3>Move History</h3>
+                <div id="move-history"></div>
             </div>
-            <div class="captured-black">
-                <h3>Captured Black Pieces</h3>
-                <div id="captured-black-pieces"></div>
+            
+            <div class="captured-pieces">
+                <div class="captured-white">
+                    <h3>Captured White Pieces</h3>
+                    <div id="captured-white-pieces"></div>
+                </div>
+                <div class="captured-black">
+                    <h3>Captured Black Pieces</h3>
+                    <div id="captured-black-pieces"></div>
+                </div>
             </div>
         </div>
         
