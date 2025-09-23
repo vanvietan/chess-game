@@ -1,8 +1,8 @@
-# Build stage
+# Railway-optimized Dockerfile
 FROM golang:1.21-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git
+# Install dependencies
+RUN apk add --no-cache git ca-certificates
 
 # Set working directory
 WORKDIR /app
@@ -17,42 +17,31 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o chess-game .
 
 # Final stage
 FROM alpine:latest
 
-# Install Stockfish and other dependencies
-RUN apk --no-cache add stockfish ca-certificates
+# Install ca-certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates
 
-# Create non-root user
-RUN adduser -D -s /bin/sh appuser
+WORKDIR /root/
 
-# Set working directory
-WORKDIR /app
-
-# Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Copy static files
-COPY --chown=appuser:appuser index.html .
-COPY --chown=appuser:appuser frontend.js .
-COPY --chown=appuser:appuser chess.js .
-COPY --chown=appuser:appuser styles.css .
-
-# Change ownership of the app directory
-RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
+# Copy the binary and static files
+COPY --from=builder /app/chess-game .
+COPY --from=builder /app/index.html .
+COPY --from=builder /app/frontend.js .
+COPY --from=builder /app/chess.js .
+COPY --from=builder /app/styles.css .
 
 # Expose port
 EXPOSE 8080
 
 # Set environment variables
 ENV PORT=8080
-ENV STOCKFISH_PATH=/usr/bin/stockfish
-ENV USE_CHESS_API=false
+ENV USE_CHESS_API=true
+ENV CHESS_API_URL=https://chess-api.com/v1
+ENV GIN_MODE=release
 
 # Run the application
-CMD ["./main"]
+CMD ["./chess-game"]
