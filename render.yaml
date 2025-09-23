@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: chess-game
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    envVars:
+      - key: USE_CHESS_API
+        value: "true"
+      - key: CHESS_API_URL
+        value: "https://chess-api.com/v1"
+      - key: GIN_MODE
+        value: "release"
+      - key: PORT
+        value: "8080"
+    healthCheckPath: /api/health
