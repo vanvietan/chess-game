@@ -121,6 +121,8 @@ class ChessGameClient {
     sendWebSocketMessage(message) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(JSON.stringify(message));
+        } else {
+            console.log('WebSocket not available, skipping message:', message);
         }
     }
     
