@@ -25,7 +25,7 @@ setup-dev:
 # Build the application
 build:
 	@echo "Building Go application..."
-	go build -o bin/chess-game main.go
+	go build -o bin/chess-game main_server.go
 	@echo "Build complete!"
 
 # Run locally with Chess-API.com (default)
@@ -34,7 +34,7 @@ run:
 	@export USE_CHESS_API=true && \
 	export CHESS_API_URL=https://chess-api.com/v1 && \
 	export PORT=8080 && \
-	go run main.go
+	go run main_server.go
 
 # Run locally with Stockfish (optional)
 run-stockfish:
@@ -42,7 +42,7 @@ run-stockfish:
 	@export USE_CHESS_API=false && \
 	export STOCKFISH_PATH=/usr/local/bin/stockfish && \
 	export PORT=8080 && \
-	go run main.go
+	go run main_server.go
 
 # Run tests
 test:
@@ -118,7 +118,7 @@ run-custom-stockfish:
 	export USE_CHESS_API=false && \
 	export STOCKFISH_PATH=$$path && \
 	export PORT=8080 && \
-	go run main.go
+	go run main_server.go
 
 # Check if Stockfish is available
 check-stockfish:
