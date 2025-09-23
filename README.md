@@ -5,7 +5,7 @@ A simple, elegant chess game built with vanilla JavaScript. Play against a frien
 ## ✨ Features
 
 - 🎮 **Human vs Human** - Play with a friend on the same device
-- 🤖 **Human vs AI** - Play against a simple AI opponent
+- 🤖 **Human vs AI** - Play against Stockfish 17 engine via Chess-API.com
 - 🎨 **Beautiful UI** - Clean, modern chess board design
 - 📱 **Responsive** - Works on desktop and mobile devices
 - ⚡ **Fast & Simple** - Pure frontend, no backend required
@@ -83,14 +83,25 @@ This chess game is designed to be deployed easily on any static hosting service:
 - **CSS Animations** - Smooth piece movements and highlights
 - **Responsive Design** - Mobile-friendly interface
 
-## 🎮 AI Implementation
+## 🤖 Stockfish AI Integration
 
-The AI opponent uses a simple random move selection algorithm:
-- Calculates all valid moves for the current position
-- Randomly selects one of the available moves
-- Adds realistic thinking delays for better user experience
+The AI opponent uses the powerful **Stockfish 17 engine** via [Chess-API.com](https://chess-api.com):
 
-*Note: This is a basic implementation. For stronger AI, consider integrating with chess engines like Stockfish.*
+### **🔥 AI Strength:**
+- **Depth 1-18**: Maps to difficulty levels 1-20
+- **Depth 12**: ~2350 FIDE Elo (International Master level)
+- **Depth 18**: ~2750 FIDE Elo (Grandmaster level)
+
+### **⚡ How It Works:**
+1. **Position Analysis**: Converts current board to FEN notation
+2. **Stockfish Calculation**: Sends position to Chess-API.com
+3. **Best Move**: Receives optimal move with evaluation
+4. **Fallback**: Uses random moves if API is unavailable
+
+### **🎯 Smart Features:**
+- **Adaptive Thinking Time**: Higher difficulty = longer analysis
+- **Real Evaluations**: See position scores (centipawns)
+- **Progressive Difficulty**: From beginner to super-GM strength
 
 ## 📱 Browser Compatibility
 

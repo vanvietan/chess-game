@@ -74,7 +74,7 @@ class ChessGameClient {
         
         // If AI plays white, make first move
         if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
-            setTimeout(() => this.makeRandomAIMove(), 1000);
+            setTimeout(() => this.makeStockfishAIMove(), 1000);
         }
         
         return true;
@@ -121,7 +121,7 @@ class ChessGameClient {
         if (this.gameMode === 'ai' && 
             this.currentPlayer === this.aiColor && 
             this.gameStatus === 'playing') {
-            setTimeout(() => this.makeRandomAIMove(), 1000);
+            setTimeout(() => this.makeStockfishAIMove(), 1000);
         }
         
         return true;
@@ -175,7 +175,7 @@ class ChessGameClient {
         }
     }
     
-    makeRandomAIMove() {
+    async makeStockfishAIMove() {
         if (!this.gameId || this.aiThinking) {
             return;
         }
@@ -183,22 +183,64 @@ class ChessGameClient {
         this.aiThinking = true;
         this.showAIThinking(true);
         
-        // Get all possible moves for AI color
+        try {
+            // Get current position in FEN format
+            const fen = this.generateFEN();
+            
+            // Calculate depth based on difficulty (1-20 maps to 1-18)
+            const depth = Math.min(Math.max(this.aiDifficulty, 1), 18);
+            
+            console.log(`AI thinking... Difficulty: ${this.aiDifficulty}, Depth: ${depth}`);
+            
+            // Call Chess-API.com for Stockfish analysis
+            const response = await fetch('https://chess-api.com/v1', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fen: fen,
+                    depth: depth,
+                    maxThinkingTime: 50 + (this.aiDifficulty * 5) // More thinking time for higher difficulty
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data && data.move) {
+                // Parse the move from Chess-API (e.g., "e2e4" format)
+                const move = data.move;
+                const from = move.substring(0, 2);
+                const to = move.substring(2, 4);
+                const promotion = move.length > 4 ? move.substring(4) : null;
+                
+                console.log(`Stockfish suggests: ${from} -> ${to} (eval: ${data.eval}, depth: ${data.depth})`);
+                
+                // Make the AI move
+                this.makeMove(from, to, promotion);
+            } else {
+                console.error('No valid move from Chess-API, falling back to random');
+                this.makeRandomAIMove();
+            }
+        } catch (error) {
+            console.error('Chess-API error, falling back to random move:', error);
+            this.makeRandomAIMove();
+        } finally {
+            this.aiThinking = false;
+            this.showAIThinking(false);
+        }
+    }
+    
+    makeRandomAIMove() {
+        // Fallback function for when Chess-API is unavailable
         const possibleMoves = this.getAllPossibleMoves(this.aiColor);
         
         if (possibleMoves.length > 0) {
-            // Pick a random move
             const randomMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-            
-            // Make the move after a short delay for realism
             setTimeout(() => {
                 this.makeMove(randomMove.from, randomMove.to);
-                this.aiThinking = false;
-                this.showAIThinking(false);
-            }, 500 + Math.random() * 1000); // Random delay between 0.5-1.5 seconds
+            }, 500 + Math.random() * 1000);
         } else {
-            this.aiThinking = false;
-            this.showAIThinking(false);
             console.log('No possible moves for AI');
         }
     }
@@ -238,7 +280,66 @@ class ChessGameClient {
         return { row, col };
     }
     
-    // FEN functionality removed - simplified frontend-only implementation
+    generateFEN() {
+        // Generate FEN string from current board position
+        let fen = '';
+        
+        // 1. Piece placement
+        for (let row = 0; row < 8; row++) {
+            let emptyCount = 0;
+            let rowString = '';
+            
+            for (let col = 0; col < 8; col++) {
+                const piece = this.board[row][col];
+                if (piece) {
+                    if (emptyCount > 0) {
+                        rowString += emptyCount;
+                        emptyCount = 0;
+                    }
+                    const char = this.getFENChar(piece.type);
+                    rowString += piece.color === 'white' ? char.toUpperCase() : char.toLowerCase();
+                } else {
+                    emptyCount++;
+                }
+            }
+            
+            if (emptyCount > 0) {
+                rowString += emptyCount;
+            }
+            
+            fen += rowString;
+            if (row < 7) fen += '/';
+        }
+        
+        // 2. Active color
+        fen += ` ${this.currentPlayer.charAt(0)}`;
+        
+        // 3. Castling availability (simplified - assume none for now)
+        fen += ' -';
+        
+        // 4. En passant target square (simplified - assume none)
+        fen += ' -';
+        
+        // 5. Halfmove clock (simplified)
+        fen += ' 0';
+        
+        // 6. Fullmove number (simplified)
+        fen += ' 1';
+        
+        return fen;
+    }
+    
+    getFENChar(type) {
+        const map = {
+            'pawn': 'p',
+            'rook': 'r',
+            'knight': 'n',
+            'bishop': 'b',
+            'queen': 'q',
+            'king': 'k'
+        };
+        return map[type] || 'p';
+    }
     
     renderBoard() {
         const boardElement = document.getElementById('chess-board');
@@ -573,7 +674,15 @@ class ChessGameClient {
     }
     
     showAIThinking(show) {
-        document.getElementById('ai-status').style.display = show ? 'block' : 'none';
+        const aiStatus = document.getElementById('ai-status');
+        const aiThinking = document.getElementById('ai-thinking');
+        
+        if (show) {
+            aiStatus.style.display = 'block';
+            aiThinking.textContent = `Stockfish is analyzing... (Depth ${Math.min(this.aiDifficulty, 18)})`;
+        } else {
+            aiStatus.style.display = 'none';
+        }
     }
     
     showMoveProcessing(show) {
