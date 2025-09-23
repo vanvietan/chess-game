@@ -16,6 +16,7 @@ class ChessGameClient {
         this.moveHistory = [];
         this.capturedPieces = { white: [], black: [] };
         this.showMoveHighlighting = true;
+        this.soundEnabled = true;
         
         
         // Initialize
@@ -23,7 +24,9 @@ class ChessGameClient {
         this.attachEventListeners();
         this.updateUI();
         this.updateToggleButtonState();
+        this.updateSoundButtonState();
         this.setupKeyboardNavigation();
+        this.initializeSoundSystem();
     }
     
     initializeChessboard() {
@@ -111,6 +114,9 @@ class ChessGameClient {
             };
             const captureColor = capturedPiece.color === 'w' ? 'white' : 'black';
             this.capturedPieces[captureColor].push(capturedPiece);
+            this.playSound('capture');
+        } else {
+            this.playSound('move');
         }
         
         this.updateUI();
@@ -119,9 +125,15 @@ class ChessGameClient {
         // Clear any error messages
         this.clearErrorMessage();
         
+        // Check for game state sounds
         if (this.game.game_over()) {
+            if (this.game.in_checkmate()) {
+                this.playSound('checkmate');
+            }
             this.handleGameOver();
             return;
+        } else if (this.game.in_check()) {
+            this.playSound('check');
         }
         
         if (this.gameMode === 'ai') {
@@ -234,14 +246,17 @@ class ChessGameClient {
             console.error('Chessboard not initialized when creating game');
             // Try to reinitialize
             this.initializeChessboard();
-                return false;
-        }
+        return false;
+    }
         
         this.updateUI();
         this.updateMoveHistoryDisplay();
         this.updateGameIdDisplay();
         this.clearMoveHighlighting();
         this.clearErrorMessage();
+        
+        // Play game start sound
+        this.playSound('gameStart');
         
         if (mode === 'ai' && aiSettings && aiSettings.color === 'white') {
             if (this.chessboard) {
@@ -472,17 +487,19 @@ class ChessGameClient {
     }
     
     updateCapturedPiecesDisplay() {
-        const capturedWhiteEl = document.querySelector('.captured-white .pieces');
-        const capturedBlackEl = document.querySelector('.captured-black .pieces');
+        const capturedWhiteEl = document.getElementById('captured-white-pieces');
+        const capturedBlackEl = document.getElementById('captured-black-pieces');
         
         if (capturedWhiteEl) {
-            capturedWhiteEl.innerHTML = this.capturedPieces.white
-                .map(piece => this.getPieceSymbol(piece.type, 'white')).join(' ');
+            const whiteSymbols = this.capturedPieces.white
+                .map(piece => this.getPieceSymbol(piece.type, 'white'));
+            capturedWhiteEl.innerHTML = whiteSymbols.join(' ');
         }
         
         if (capturedBlackEl) {
-            capturedBlackEl.innerHTML = this.capturedPieces.black
-                .map(piece => this.getPieceSymbol(piece.type, 'black')).join(' ');
+            const blackSymbols = this.capturedPieces.black
+                .map(piece => this.getPieceSymbol(piece.type, 'black'));
+            capturedBlackEl.innerHTML = blackSymbols.join(' ');
         }
     }
     
@@ -504,6 +521,115 @@ class ChessGameClient {
                 this.rotateBoard();
             }
         });
+    }
+    
+    // Sound System
+    initializeSoundSystem() {
+        try {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        } catch (error) {
+            console.warn('Web Audio API not supported, sounds disabled');
+            this.soundEnabled = false;
+        }
+    }
+    
+    playSound(type) {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(this.audioContext.destination);
+            
+            // Different sounds for different events
+            switch (type) {
+                case 'move':
+                    oscillator.frequency.setValueAtTime(800, this.audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.1);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.1);
+                    break;
+                    
+                case 'capture':
+                    oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(400, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.2);
+                    break;
+                    
+                case 'check':
+                    // High-pitched warning sound
+                    oscillator.frequency.setValueAtTime(1500, this.audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(1200, this.audioContext.currentTime + 0.1);
+                    oscillator.frequency.setValueAtTime(1500, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.4, this.audioContext.currentTime + 0.2);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.3);
+                    break;
+                    
+                case 'checkmate':
+                    // Victory/defeat fanfare
+                    oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime); // C5
+                    oscillator.frequency.setValueAtTime(659, this.audioContext.currentTime + 0.2); // E5
+                    oscillator.frequency.setValueAtTime(784, this.audioContext.currentTime + 0.4); // G5
+                    oscillator.frequency.setValueAtTime(1047, this.audioContext.currentTime + 0.6); // C6
+                    gainNode.gain.setValueAtTime(0.5, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 1.0);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 1.0);
+                    break;
+                    
+                case 'gameStart':
+                    // Game start sound
+                    oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime); // A4
+                    oscillator.frequency.setValueAtTime(523, this.audioContext.currentTime + 0.15); // C5
+                    gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.3);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.3);
+                    break;
+                    
+                default:
+                    // Default click sound
+                    oscillator.frequency.setValueAtTime(600, this.audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.05);
+                    oscillator.start(this.audioContext.currentTime);
+                    oscillator.stop(this.audioContext.currentTime + 0.05);
+            }
+        } catch (error) {
+            console.warn('Error playing sound:', error);
+        }
+    }
+    
+    toggleSound() {
+        this.soundEnabled = !this.soundEnabled;
+        this.updateSoundButtonState();
+        
+        // Play a test sound when enabling
+        if (this.soundEnabled) {
+            this.playSound('move');
+        }
+    }
+    
+    updateSoundButtonState() {
+        const soundBtn = document.getElementById('sound-toggle-btn');
+        if (soundBtn) {
+            const icon = soundBtn.querySelector('.toggle-icon');
+            if (icon) {
+                icon.textContent = this.soundEnabled ? '🔊' : '🔇';
+            }
+            soundBtn.classList.toggle('active', this.soundEnabled);
+        }
     }
     
     
@@ -586,6 +712,16 @@ class ChessGameClient {
             console.log('Toggle move highlight button listener attached successfully');
         } else {
             console.error('Toggle move highlight button not found');
+        }
+
+        const soundToggleBtn = document.getElementById('sound-toggle-btn');
+        if (soundToggleBtn) {
+            soundToggleBtn.addEventListener('click', () => {
+                this.toggleSound();
+            });
+            console.log('Sound toggle button listener attached successfully');
+        } else {
+            console.error('Sound toggle button not found');
         }
         
         const modal = document.getElementById('ai-setup-modal');
