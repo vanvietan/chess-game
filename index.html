@@ -32,6 +32,7 @@
             <button id="new-game-btn" class="btn">New Game (PvP)</button>
             <button id="ai-game-btn" class="btn">Play vs AI</button>
             <button id="undo-btn" class="btn">Undo Move</button>
+            <button id="rotate-board-btn" class="btn">Rotate Board</button>
         </div>
         
         <div id="ai-setup-modal" class="modal" style="display: none;">
@@ -85,14 +86,21 @@
             </div>
         </div>
         
-        <div class="captured-pieces">
-            <div class="captured-white">
-                <h3>Captured White Pieces</h3>
-                <div id="captured-white-pieces"></div>
+        <div class="game-info-bottom">
+            <div class="move-notation">
+                <h3>Move History</h3>
+                <div id="move-history"></div>
             </div>
-            <div class="captured-black">
-                <h3>Captured Black Pieces</h3>
-                <div id="captured-black-pieces"></div>
+            
+            <div class="captured-pieces">
+                <div class="captured-white">
+                    <h3>Captured White Pieces</h3>
+                    <div id="captured-white-pieces"></div>
+                </div>
+                <div class="captured-black">
+                    <h3>Captured Black Pieces</h3>
+                    <div id="captured-black-pieces"></div>
+                </div>
             </div>
         </div>
         

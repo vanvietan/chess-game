@@ -379,10 +379,65 @@ body {
     transform: translateY(0);
 }
 
+.game-info-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    margin-top: 30px;
+}
+
+.move-notation {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.move-notation h3 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+#move-history {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.move-number {
+    font-weight: bold;
+    color: #666;
+    text-align: right;
+    padding-right: 5px;
+}
+
+.move-white, .move-black {
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.move-white {
+    background: #e8e8e8;
+}
+
+.move-black {
+    background: #d0d0d0;
+}
+
+.move-white:hover, .move-black:hover {
+    background: #c0c0c0;
+}
+
 .captured-pieces {
     display: flex;
     justify-content: space-between;
-    margin-top: 30px;
 }
 
 .captured-white, .captured-black {
@@ -451,6 +506,11 @@ body {
     .game-info {
         grid-template-columns: 1fr;
         gap: 10px;
+    }
+    
+    .game-info-bottom {
+        grid-template-columns: 1fr;
+        gap: 20px;
     }
     
     .captured-pieces {

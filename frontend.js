@@ -11,6 +11,11 @@ class ChessGameClient {
         this.aiThinking = false;
         this.ws = null;
         
+        // Board rotation and move history
+        this.boardRotated = false; // false = white on bottom, true = black on bottom
+        this.moveHistory = []; // Store all moves for notation
+        this.fullMoveNumber = 1; // Full move counter
+        
         // Track castling rights and en passant
         this.castlingRights = {
             white: { kingside: true, queenside: true },
@@ -85,6 +90,8 @@ class ChessGameClient {
         };
         this.enPassantTarget = null;
         this.lastMove = null;
+        this.moveHistory = [];
+        this.fullMoveNumber = 1;
         
         this.renderBoard();
         this.updateUI();
@@ -161,7 +168,9 @@ class ChessGameClient {
         }
         
         // Handle pawn promotion
+        let isPromotion = false;
         if (piece.type === 'pawn' && (toCoords.row === 0 || toCoords.row === 7)) {
+            isPromotion = true;
             if (promotion) {
                 // Promotion piece already chosen (e.g., from AI)
                 this.board[toCoords.row][toCoords.col].type = promotion;
@@ -180,6 +189,11 @@ class ChessGameClient {
         
         // Store last move
         this.lastMove = moveInfo;
+        
+        // Add move to history for notation (only if not a promotion waiting for user input)
+        if (!isPromotion || promotion) {
+            this.addMoveToHistory(moveInfo, isEnPassant, isCastling, promotion);
+        }
         
         // Switch players
         this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
@@ -654,10 +668,14 @@ class ChessGameClient {
         console.log('Rendering board...', this.board); // Debug log
         boardElement.innerHTML = '';
         
-        for (let row = 0; row < 8; row++) {
-            for (let col = 0; col < 8; col++) {
+        for (let displayRow = 0; displayRow < 8; displayRow++) {
+            for (let displayCol = 0; displayCol < 8; displayCol++) {
+                // Get logical coordinates based on rotation
+                const { row, col } = this.getLogicalCoords(displayRow, displayCol);
+                
                 const square = document.createElement('div');
-                square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                square.className = `square ${(displayRow + displayCol) % 2 === 0 ? 'light' : 'dark'}`;
+                // Store logical coordinates in dataset
                 square.dataset.row = row;
                 square.dataset.col = col;
                 
@@ -718,6 +736,162 @@ class ChessGameClient {
         const files = 'abcdefgh';
         const ranks = '87654321';
         return files[col] + ranks[row];
+    }
+    
+    // Get display coordinates for board rendering (handles rotation)
+    getDisplayCoords(row, col) {
+        if (this.boardRotated) {
+            return {
+                displayRow: 7 - row,
+                displayCol: 7 - col
+            };
+        }
+        return {
+            displayRow: row,
+            displayCol: col
+        };
+    }
+    
+    // Convert display coordinates back to logical coordinates
+    getLogicalCoords(displayRow, displayCol) {
+        if (this.boardRotated) {
+            return {
+                row: 7 - displayRow,
+                col: 7 - displayCol
+            };
+        }
+        return {
+            row: displayRow,
+            col: displayCol
+        };
+    }
+    
+    // Board rotation function
+    rotateBoard() {
+        this.boardRotated = !this.boardRotated;
+        this.clearSelection();
+        this.renderBoard();
+        console.log('Board rotated:', this.boardRotated ? 'Black on bottom' : 'White on bottom');
+    }
+    
+    // Chess notation functions
+    addMoveToHistory(moveInfo, isEnPassant, isCastling, promotion) {
+        const notation = this.generateMoveNotation(moveInfo, isEnPassant, isCastling, promotion);
+        
+        this.moveHistory.push({
+            from: moveInfo.from,
+            to: moveInfo.to,
+            notation: notation,
+            color: moveInfo.color,
+            moveNumber: this.fullMoveNumber
+        });
+        
+        // Increment full move number after black moves
+        if (moveInfo.color === 'black') {
+            this.fullMoveNumber++;
+        }
+        
+        this.updateMoveHistoryDisplay();
+    }
+    
+    generateMoveNotation(moveInfo, isEnPassant, isCastling, promotion) {
+        const { piece, color, from, to, captured } = moveInfo;
+        
+        // Handle castling
+        if (isCastling) {
+            const toCol = this.parseSquareNotation(to).col;
+            return toCol > 4 ? 'O-O' : 'O-O-O'; // Kingside or queenside
+        }
+        
+        let notation = '';
+        
+        // Piece letter (except for pawns)
+        if (piece !== 'pawn') {
+            const pieceLetters = {
+                'king': 'K', 'queen': 'Q', 'rook': 'R',
+                'bishop': 'B', 'knight': 'N'
+            };
+            notation += pieceLetters[piece];
+        }
+        
+        // For disambiguating moves (simplified - could be enhanced)
+        // This would need more complex logic to check for ambiguous moves
+        
+        // Capture notation
+        if (captured || isEnPassant) {
+            if (piece === 'pawn') {
+                notation += from[0]; // File of capturing pawn
+            }
+            notation += 'x';
+        }
+        
+        // Destination square
+        notation += to;
+        
+        // En passant
+        if (isEnPassant) {
+            notation += ' e.p.';
+        }
+        
+        // Promotion
+        if (promotion) {
+            const pieceLetters = {
+                'queen': 'Q', 'rook': 'R', 'bishop': 'B', 'knight': 'N'
+            };
+            notation += '=' + pieceLetters[promotion];
+        }
+        
+        // TODO: Add check/checkmate indicators (+, #)
+        
+        return notation;
+    }
+    
+    updateMoveHistoryDisplay() {
+        const historyElement = document.getElementById('move-history');
+        if (!historyElement) return;
+        
+        historyElement.innerHTML = '';
+        
+        // Group moves by full move number
+        const groupedMoves = {};
+        this.moveHistory.forEach(move => {
+            if (!groupedMoves[move.moveNumber]) {
+                groupedMoves[move.moveNumber] = {};
+            }
+            groupedMoves[move.moveNumber][move.color] = move;
+        });
+        
+        // Display moves
+        Object.keys(groupedMoves).forEach(moveNum => {
+            const moves = groupedMoves[moveNum];
+            
+            // Move number
+            const numberElement = document.createElement('div');
+            numberElement.className = 'move-number';
+            numberElement.textContent = moveNum + '.';
+            historyElement.appendChild(numberElement);
+            
+            // White move
+            const whiteElement = document.createElement('div');
+            whiteElement.className = 'move-white';
+            whiteElement.textContent = moves.white ? moves.white.notation : '';
+            if (moves.white) {
+                whiteElement.title = `${moves.white.from} → ${moves.white.to}`;
+            }
+            historyElement.appendChild(whiteElement);
+            
+            // Black move
+            const blackElement = document.createElement('div');
+            blackElement.className = 'move-black';
+            blackElement.textContent = moves.black ? moves.black.notation : '';
+            if (moves.black) {
+                blackElement.title = `${moves.black.from} → ${moves.black.to}`;
+            }
+            historyElement.appendChild(blackElement);
+        });
+        
+        // Auto-scroll to bottom
+        historyElement.scrollTop = historyElement.scrollHeight;
     }
     
     highlightSquare(square) {
@@ -917,6 +1091,11 @@ class ChessGameClient {
             console.log('Undo not implemented yet');
         });
         
+        // Rotate board button
+        document.getElementById('rotate-board-btn').addEventListener('click', () => {
+            this.rotateBoard();
+        });
+        
         // Close modal when clicking outside
         window.addEventListener('click', (event) => {
             if (event.target === modal) {
@@ -978,6 +1157,11 @@ class ChessGameClient {
     }
     
     finalizeMoveAfterPromotion() {
+        // Add the promotion move to history if we have lastMove
+        if (this.lastMove) {
+            this.addMoveToHistory(this.lastMove, false, false, this.board[this.lastMove.toCoords.row][this.lastMove.toCoords.col].type);
+        }
+        
         // Switch players
         this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white';
         
