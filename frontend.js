@@ -618,8 +618,22 @@ class ChessGameClient {
             return false;
         }
         
-        // TODO: Check if king is in check or would pass through check
-        // For now, just allow the move if path is clear
+        // Check if king is in check (castling not allowed when in check)
+        if (this.isKingInCheck(color)) {
+            return false;
+        }
+        
+        // Check if king would pass through check during castling
+        const kingRow = fromRow;
+        const step = isKingside ? 1 : -1;
+        
+        // Check each square the king passes through
+        for (let col = fromCol + step; col !== toCol + step; col += step) {
+            // Temporarily move king to this square and check if it would be in check
+            if (this.wouldKingBeInCheckAt(color, kingRow, col)) {
+                return false;
+            }
+        }
         
         return true;
     }
@@ -628,6 +642,82 @@ class ChessGameClient {
         if (piece.type !== 'king') return false;
         const colDiff = Math.abs(toCoords.col - fromCoords.col);
         return colDiff === 2;
+    }
+    
+    // Check detection functions
+    isKingInCheck(color) {
+        // Find the king's position
+        const kingPos = this.findKing(color);
+        if (!kingPos) return false;
+        
+        return this.isSquareUnderAttack(kingPos.row, kingPos.col, color);
+    }
+    
+    wouldKingBeInCheckAt(color, row, col) {
+        // Check if king would be under attack at the given position
+        return this.isSquareUnderAttack(row, col, color);
+    }
+    
+    findKing(color) {
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const piece = this.board[row][col];
+                if (piece && piece.type === 'king' && piece.color === color) {
+                    return { row, col };
+                }
+            }
+        }
+        return null;
+    }
+    
+    isSquareUnderAttack(row, col, kingColor) {
+        const opponentColor = kingColor === 'white' ? 'black' : 'white';
+        
+        // Check if any opponent piece can attack this square
+        for (let fromRow = 0; fromRow < 8; fromRow++) {
+            for (let fromCol = 0; fromCol < 8; fromCol++) {
+                const piece = this.board[fromRow][fromCol];
+                if (piece && piece.color === opponentColor) {
+                    if (this.canPieceAttackSquare(fromRow, fromCol, row, col, piece)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    
+    canPieceAttackSquare(fromRow, fromCol, toRow, toCol, piece) {
+        // Check if a piece can attack a specific square (similar to movement but ignoring king safety)
+        const rowDiff = Math.abs(toRow - fromRow);
+        const colDiff = Math.abs(toCol - fromCol);
+        
+        switch (piece.type) {
+            case 'pawn':
+                return this.canPawnAttackSquare(fromRow, fromCol, toRow, toCol, piece.color);
+            case 'rook':
+                return (rowDiff === 0 || colDiff === 0) && this.isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'bishop':
+                return rowDiff === colDiff && this.isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'queen':
+                return (rowDiff === 0 || colDiff === 0 || rowDiff === colDiff) && 
+                       this.isPathClear(fromRow, fromCol, toRow, toCol);
+            case 'knight':
+                return (rowDiff === 2 && colDiff === 1) || (rowDiff === 1 && colDiff === 2);
+            case 'king':
+                return rowDiff <= 1 && colDiff <= 1 && (rowDiff > 0 || colDiff > 0);
+            default:
+                return false;
+        }
+    }
+    
+    canPawnAttackSquare(fromRow, fromCol, toRow, toCol, color) {
+        const direction = color === 'white' ? -1 : 1;
+        const rowDiff = toRow - fromRow;
+        const colDiff = Math.abs(toCol - fromCol);
+        
+        // Pawns attack diagonally one square forward
+        return rowDiff === direction && colDiff === 1;
     }
     
     updateCastlingRights(moveInfo) {
