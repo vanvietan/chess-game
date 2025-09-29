@@ -11,6 +11,16 @@ class ChessGameClient {
         this.aiDifficulty = 8;
         this.aiThinking = false;
         
+        // P2P/Multiplayer state
+        this.isMultiplayer = false;
+        this.peerID = null;
+        this.isHost = false;
+        this.connectedPeers = [];
+        
+        // WebSocket connection
+        this.ws = null;
+        this.wsConnected = false;
+        
         // UI state
         this.boardRotated = false;
         this.moveHistory = [];
@@ -35,6 +45,7 @@ class ChessGameClient {
         this.updateSoundButtonState();
         this.setupKeyboardNavigation();
         this.initializeSoundSystem();
+        this.initializeWebSocket();
     }
     
     initializeChessboard() {
@@ -435,6 +446,21 @@ class ChessGameClient {
         
         // Clear any error messages
         this.clearErrorMessage();
+        
+        // Send move to backend if in multiplayer mode
+        if (this.isMultiplayer && this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.sendWebSocketMessage('make_move', {
+                from: move.from,
+                to: move.to,
+                piece: move.piece,
+                captured: move.captured,
+                promotion: move.promotion,
+                san: move.san,
+                fen: this.game.fen(),
+                is_check: this.game.in_check(),
+                is_checkmate: this.game.in_checkmate()
+            });
+        }
         
         // Check for game state sounds
         if (this.game.game_over()) {
@@ -970,6 +996,18 @@ class ChessGameClient {
                 document.getElementById('ai-setup-modal').style.display = 'flex';
             });
             console.log('AI game button listener attached successfully');
+            
+        // P2P Multiplayer button
+        const p2pGameBtn = document.getElementById('p2p-game-btn');
+        if (p2pGameBtn) {
+            p2pGameBtn.addEventListener('click', () => {
+                console.log('P2P Multiplayer button clicked');
+                this.createMultiplayerGame('Player');
+            });
+            console.log('P2P game button listener attached successfully');
+        } else {
+            console.error('P2P game button not found');
+        }
         } catch (error) {
             console.error('Error attaching AI game button listener:', error);
         }
@@ -1090,6 +1128,198 @@ class ChessGameClient {
         difficultySlider.addEventListener('input', () => {
             difficultyValue.textContent = difficultySlider.value;
         });
+    }
+    
+    // WebSocket Integration for P2P Multiplayer
+    initializeWebSocket() {
+        const wsUrl = `ws://${window.location.host}/ws`;
+        console.log('🔌 Connecting to WebSocket:', wsUrl);
+        
+        try {
+            this.ws = new WebSocket(wsUrl);
+            
+            this.ws.onopen = (event) => {
+                console.log('✅ WebSocket connected');
+                this.wsConnected = true;
+                this.updateConnectionStatus();
+            };
+            
+            this.ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    this.handleWebSocketMessage(message);
+                } catch (error) {
+                    console.error('Failed to parse WebSocket message:', error);
+                }
+            };
+            
+            this.ws.onclose = (event) => {
+                console.log('🔌 WebSocket disconnected');
+                this.wsConnected = false;
+                this.updateConnectionStatus();
+                
+                // Attempt to reconnect after 3 seconds
+                setTimeout(() => {
+                    if (!this.wsConnected) {
+                        console.log('🔄 Attempting to reconnect...');
+                        this.initializeWebSocket();
+                    }
+                }, 3000);
+            };
+            
+            this.ws.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
+                this.wsConnected = false;
+                this.updateConnectionStatus();
+            };
+            
+        } catch (error) {
+            console.error('Failed to initialize WebSocket:', error);
+        }
+    }
+    
+    handleWebSocketMessage(message) {
+        console.log('📨 Received:', message.type, message.data);
+        
+        switch (message.type) {
+            case 'connected':
+                this.peerID = message.data.peer_id;
+                console.log('🆔 Our Peer ID:', this.peerID);
+                break;
+                
+            case 'game_created':
+                this.handleGameCreated(message.data);
+                break;
+                
+            case 'game_invite':
+                this.handleGameInvite(message.data);
+                break;
+                
+            case 'game_start':
+                this.handleGameStart(message.data);
+                break;
+                
+            case 'move':
+                this.handleOpponentMove(message.data);
+                break;
+                
+            case 'game_state':
+                this.handleGameState(message.data);
+                break;
+                
+            case 'error':
+                this.handleError(message.data);
+                break;
+                
+            default:
+                console.log('Unknown message type:', message.type);
+        }
+    }
+    
+    sendWebSocketMessage(type, data = {}) {
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+            console.error('WebSocket not connected');
+            return false;
+        }
+        
+        const message = { type, data };
+        this.ws.send(JSON.stringify(message));
+        console.log('📤 Sent:', type, data);
+        return true;
+    }
+    
+    updateConnectionStatus() {
+        const statusElement = document.querySelector('.game-status span');
+        if (statusElement) {
+            if (this.wsConnected) {
+                statusElement.style.color = '#4CAF50';
+                if (this.gameStatus === 'waiting') {
+                    statusElement.textContent = 'Connected - Ready to Play';
+                }
+            } else {
+                statusElement.style.color = '#f44336';
+                statusElement.textContent = 'Disconnected';
+            }
+        }
+    }
+    
+    // P2P Game Methods
+    createMultiplayerGame(playerName = 'Player') {
+        this.isMultiplayer = true;
+        this.isHost = true;
+        this.gameMode = 'multiplayer';
+        
+        return this.sendWebSocketMessage('create_game', {
+            player_name: playerName
+        });
+    }
+    
+    handleGameCreated(data) {
+        this.gameId = data.game.id;
+        this.gameStatus = 'waiting';
+        console.log('🎮 Multiplayer game created:', this.gameId);
+        this.updateUI();
+        
+        // Show peer ID for sharing
+        this.showPeerInfo();
+    }
+    
+    showPeerInfo() {
+        const info = `
+            <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                <h3>🎮 Multiplayer Game Created!</h3>
+                <p><strong>Game ID:</strong> ${this.gameId}</p>
+                <p><strong>Your Peer ID:</strong> ${this.peerID}</p>
+                <p>Share this Peer ID with your opponent to join the game.</p>
+            </div>
+        `;
+        
+        // Add to the page
+        const gameContainer = document.querySelector('.game-container');
+        if (gameContainer) {
+            const existingInfo = gameContainer.querySelector('.peer-info');
+            if (existingInfo) {
+                existingInfo.remove();
+            }
+            
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'peer-info';
+            infoDiv.innerHTML = info;
+            gameContainer.insertBefore(infoDiv, gameContainer.children[1]);
+        }
+    }
+    
+    handleOpponentMove(data) {
+        const move = data.move;
+        const game = data.game;
+        
+        // Apply the move to our board
+        const chessMove = this.game.move({
+            from: move.from,
+            to: move.to,
+            promotion: move.promotion
+        });
+        
+        if (chessMove) {
+            this.chessboard.position(this.game.fen());
+            this.updateAfterMove(chessMove);
+            console.log('♟️ Opponent move applied:', move.san);
+        } else {
+            console.error('Failed to apply opponent move:', move);
+        }
+    }
+    
+    handleGameState(data) {
+        const game = data.game;
+        // Sync game state
+        this.game.load(game.board_fen);
+        this.chessboard.position(this.game.fen());
+        this.updateUI();
+    }
+    
+    handleError(data) {
+        console.error('Game error:', data);
+        alert('Game Error: ' + (data.message || 'Unknown error'));
     }
 }
 
