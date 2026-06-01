@@ -60,6 +60,8 @@ class ChessGameClient {
             return;
         }
 
+        this.applyResponsiveBoardSize();
+
         try {
             this.chessboard = Chessboard('chessboard', {
                 draggable: true,
@@ -79,6 +81,8 @@ class ChessGameClient {
             
             // Override chessboard.js click handling
             setTimeout(() => this.overrideChessboardClicks(), 1000);
+            setTimeout(() => this.resizeChessboard(), 0);
+            window.addEventListener('resize', () => this.resizeChessboard());
             
         } catch (error) {
             setTimeout(() => this.initializeChessboard(), 500);
@@ -87,6 +91,44 @@ class ChessGameClient {
         
         this.updateUI();
         }
+
+    resizeChessboard() {
+        this.applyResponsiveBoardSize();
+
+        if (!this.chessboard || typeof this.chessboard.resize !== 'function') {
+            return;
+        }
+
+        this.chessboard.resize();
+        this.chessboard.position(this.game.fen(), false);
+    }
+
+    applyResponsiveBoardSize() {
+        const boardShell = document.querySelector('.board-container-inner');
+        const boardElement = document.getElementById('chessboard');
+        if (!boardShell || !boardElement) return;
+
+        const viewportWidth = Math.min(
+            window.innerWidth || 520,
+            window.outerWidth || window.innerWidth || 520,
+            window.screen ? window.screen.width : 520
+        );
+        const parentWidth = boardShell.parentElement ? boardShell.parentElement.clientWidth : viewportWidth;
+        const availableWidth = Math.min(parentWidth - 24, viewportWidth - 76);
+        const shellSize = Math.max(240, Math.min(520, availableWidth));
+
+        boardShell.style.width = shellSize + 'px';
+        boardShell.style.height = 'auto';
+        boardElement.style.width = shellSize + 'px';
+        boardElement.style.height = shellSize + 'px';
+
+        requestAnimationFrame(() => {
+            const renderedBoard = boardElement.firstElementChild;
+            if (renderedBoard) {
+                boardShell.style.height = renderedBoard.getBoundingClientRect().height + 'px';
+            }
+        });
+    }
         
     onDragStart(source, piece, position, orientation) {
         // Check if drag is allowed in current input method
@@ -399,8 +441,8 @@ class ChessGameClient {
         
         if (button && text) {
             const icons = {
-                'drag': '🖱️',
-                'click': '👆'
+                'drag': 'Mouse',
+                'click': 'Tap'
             };
             
             const names = {
@@ -752,13 +794,13 @@ class ChessGameClient {
     }
     
     updateUI() {
-        const currentPlayerEl = document.querySelector('.current-player span');
+        const currentPlayerEl = document.getElementById('current-player');
         if (currentPlayerEl) {
             const currentPlayer = this.game.turn() === 'w' ? 'White' : 'Black';
             currentPlayerEl.textContent = currentPlayer;
         }
         
-        const gameStatusEl = document.querySelector('.game-status span');
+        const gameStatusEl = document.getElementById('game-status');
         if (gameStatusEl) {
             let status = 'Ready to Play';
             
@@ -786,18 +828,23 @@ class ChessGameClient {
             gameStatusEl.textContent = status;
         }
         
-        const gameModeEl = document.querySelector('.game-mode span');
+        const gameModeEl = document.getElementById('game-mode');
         if (gameModeEl) {
             const mode = this.gameMode === 'ai' ? 'Human vs AI (' + this.aiColor + ')' : 'Human vs Human';
             gameModeEl.textContent = mode;
         }
         
-        const aiInfoEl = document.querySelector('.ai-info span');
+        const aiInfoContainer = document.getElementById('ai-info');
+        const aiInfoEl = document.getElementById('ai-difficulty-display');
         if (aiInfoEl) {
             const depthLevel = Math.min(Math.max(this.aiDifficulty, 1), 18);
             const strengthDesc = this.getAILevelDescription(this.aiDifficulty);
             
-            aiInfoEl.textContent = `AI: Stockfish 17 Depth ${depthLevel} (${strengthDesc})`;
+            aiInfoEl.textContent = `Depth ${depthLevel} · ${strengthDesc}`;
+        }
+
+        if (aiInfoContainer) {
+            aiInfoContainer.style.display = this.gameMode === 'ai' ? 'grid' : 'none';
         }
         
         this.updateCapturedPiecesDisplay();
@@ -943,7 +990,7 @@ class ChessGameClient {
         if (soundBtn) {
             const icon = soundBtn.querySelector('.toggle-icon');
             if (icon) {
-                icon.textContent = this.soundEnabled ? '🔊' : '🔇';
+                icon.textContent = this.soundEnabled ? 'On' : 'Off';
             }
             soundBtn.classList.toggle('active', this.soundEnabled);
         }
@@ -1229,7 +1276,7 @@ class ChessGameClient {
     }
     
     updateConnectionStatus() {
-        const statusElement = document.querySelector('.game-status span');
+        const statusElement = document.getElementById('game-status');
         if (statusElement) {
             if (this.wsConnected) {
                 statusElement.style.color = '#4CAF50';
@@ -1266,8 +1313,8 @@ class ChessGameClient {
     
     showPeerInfo() {
         const info = `
-            <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.1); border-radius: 8px;">
-                <h3>🎮 Multiplayer Game Created!</h3>
+            <div>
+                <h3>Multiplayer Game Created</h3>
                 <p><strong>Game ID:</strong> ${this.gameId}</p>
                 <p><strong>Your Peer ID:</strong> ${this.peerID}</p>
                 <p>Share this Peer ID with your opponent to join the game.</p>
