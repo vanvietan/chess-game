@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Game with Stockfish AI</title>
+    <title>AI Chess Master</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,650;9..144,760&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     
     <!-- Chess.js for game logic and Chessboard.js for UI -->
@@ -14,73 +17,104 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="game-header">
-            <h1>AI Chess Master</h1>
-            <p class="subtitle">Challenge Advanced Stockfish Engine</p>
-            <div class="game-info">
-                <div class="current-player">
-                    Current Player: <span id="current-player">White</span>
+        <header class="game-header">
+            <div>
+                <p class="eyebrow">Stockfish 17 table</p>
+                <h1>AI Chess Master</h1>
+                <p class="subtitle">Focused play against local opponents, P2P challengers, or a calibrated engine.</p>
+            </div>
+            <div class="connection-card game-status">
+                <span>Status</span>
+                <strong id="game-status">Playing</strong>
+            </div>
+        </header>
+
+        <main class="play-layout">
+            <section class="board-panel" aria-label="Chess board">
+                <div class="board-topline">
+                    <div class="current-player stat-chip">
+                        <span>Turn</span>
+                        <strong id="current-player">White</strong>
+                    </div>
+                    <div class="game-mode stat-chip">
+                        <span>Mode</span>
+                        <strong id="game-mode">Human vs Human</strong>
+                    </div>
+                    <div class="ai-info stat-chip" id="ai-info" style="display: none;">
+                        <span>Engine</span>
+                        <strong id="ai-difficulty-display">8</strong>
+                    </div>
                 </div>
-                <div class="game-status">
-                    Status: <span id="game-status">Playing</span>
+
+                <div class="board-container">
+                    <div class="board-container-inner">
+                        <div id="chessboard"></div>
+                        <svg class="board-svg-overlay" id="board-svg" viewBox="0 0 520 520">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#2f6f4f" opacity="0.85"/>
+                                </marker>
+                                <marker id="arrowhead-secondary" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#b8792a" opacity="0.85"/>
+                                </marker>
+                            </defs>
+                        </svg>
+                    </div>
                 </div>
-                <div class="game-mode">
-                    Mode: <span id="game-mode">Human vs Human</span>
+            </section>
+
+            <aside class="side-panel" aria-label="Game controls">
+                <div class="game-controls">
+                    <div class="primary-controls">
+                        <button id="ai-game-btn" class="btn btn-primary">
+                            <span class="btn-icon">♞</span>
+                            Play vs AI
+                        </button>
+                        <button id="p2p-game-btn" class="btn btn-primary btn-primary-alt">
+                            <span class="btn-icon">♚</span>
+                            P2P Multiplayer
+                        </button>
+                    </div>
+
+                    <div class="secondary-controls">
+                        <button id="new-game-btn" class="btn btn-secondary">
+                            <span class="btn-icon">♙</span>
+                            Human vs Human
+                        </button>
+                        <button id="rotate-board-btn" class="btn btn-utility">
+                            <span class="btn-icon">↻</span>
+                            Rotate
+                        </button>
+                        <button id="input-method-btn" class="btn btn-utility btn-toggle" title="Switch input method">
+                            <span class="toggle-icon">Mouse</span>
+                            <span id="input-method-text">Drag</span>
+                        </button>
+                        <button id="sound-toggle-btn" class="btn btn-utility btn-toggle active" title="Toggle sound effects">
+                            <span class="toggle-icon">Sound</span>
+                            Sound
+                        </button>
+                    </div>
                 </div>
-                <div class="ai-info" id="ai-info" style="display: none;">
-                    AI Difficulty: <span id="ai-difficulty-display">8</span>/20
+
+                <div class="move-notation">
+                    <h3>Move History</h3>
+                    <div id="move-history" aria-live="polite"></div>
+                </div>
+
+                <div class="captured-pieces">
+                    <div class="captured-white">
+                        <h3>Captured White</h3>
+                        <div id="captured-white-pieces"></div>
+                    </div>
+                    <div class="captured-black">
+                        <h3>Captured Black</h3>
+                        <div id="captured-black-pieces"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        
-        <div class="board-container">
-            <div class="board-container-inner">
-                <div id="chessboard" style="width: 520px;"></div>
-                <svg class="board-svg-overlay" id="board-svg" viewBox="0 0 520 520">
-                    <defs>
-                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
-                                refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#4CAF50" opacity="0.8"/>
-                        </marker>
-                        <marker id="arrowhead-secondary" markerWidth="10" markerHeight="7" 
-                                refX="9" refY="3.5" orient="auto">
-                            <polygon points="0 0, 10 3.5, 0 7" fill="#FF9800" opacity="0.8"/>
-                        </marker>
-                    </defs>
-                </svg>
-            </div>
-        </div>
-        
-        <div class="game-controls">
-            <!-- Primary AI Button -->
-            <div class="primary-controls">
-                <button id="ai-game-btn" class="btn btn-primary">
-                    <span class="btn-icon">🤖</span>
-                    Play vs AI
-                </button>
-                <p class="primary-description">Challenge our advanced Stockfish AI engine</p>
-            </div>
-            
-            <!-- Secondary Controls -->
-            <div class="secondary-controls">
-                <button id="new-game-btn" class="btn btn-secondary">
-                    <span class="btn-icon">👥</span>
-                    Human vs Human
-                </button>
-                <button id="rotate-board-btn" class="btn btn-utility">
-                    <span class="btn-icon">🔄</span>
-                    Rotate
-                </button>
-                <button id="input-method-btn" class="btn btn-utility btn-toggle" title="Switch input method">
-                    <span class="toggle-icon">🖱️</span>
-                    <span id="input-method-text">Drag</span>
-                </button>
-                <button id="sound-toggle-btn" class="btn btn-utility btn-toggle active" title="Toggle sound effects">
-                    <span class="toggle-icon">🔊</span>
-                    Sound
-                </button>
-            </div>
-        </div>
+        </main>
+
+        <div class="error-message" style="display: none;" role="alert"></div>
         
         <div id="ai-setup-modal" class="modal" style="display: none;">
             <div class="modal-content">
@@ -132,25 +166,7 @@
                 </div>
             </div>
         </div>
-        
-        <div class="game-info-bottom">
-            <div class="move-notation">
-                <h3>Move History</h3>
-                <div id="move-history"></div>
-            </div>
-            
-            <div class="captured-pieces">
-                <div class="captured-white">
-                    <h3>Captured White Pieces</h3>
-                    <div id="captured-white-pieces"></div>
-                </div>
-                <div class="captured-black">
-                    <h3>Captured Black Pieces</h3>
-                    <div id="captured-black-pieces"></div>
-                </div>
-            </div>
-        </div>
-        
+
         <div id="ai-status" class="ai-status" style="display: none;">
             <span id="ai-thinking">AI is thinking...</span>
         </div>
